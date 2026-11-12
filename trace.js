@@ -4,10 +4,13 @@
    Il ne touche à rien dans le bodega : il se contente de lire window.bodega et window.Jukebox.
 
    Ce qui est envoyé : un numéro de visite tiré au hasard, l'appareil (téléphone ou ordinateur), les actions, le trajet.
-   Ni nom, ni adresse e-mail, ni adresse IP, ni cookie. Le visiteur est prévenu à l'arrivée et peut refuser.
+   Ni nom, ni adresse e-mail, ni adresse IP, ni cookie. Par défaut le visiteur n'est pas prévenu (réglage « avis » : 0) ;
+   avec « avis: 10 », un cartouche « Visite enregistrée » s'affiche dix secondes à l'arrivée, avec un bouton Refuser.
 
    Lien nominatif : berao.fr/?ami=marie  ->  la visite porte l'étiquette « marie » (visible aussi dans l'avertissement).
-   Voir le journal en direct sur son propre écran : ajouter #trace à l'adresse. */
+   Voir le journal en direct sur son propre écran : ajouter #trace à l'adresse.
+   Ne pas s'enregistrer soi-même : ouvrir une fois berao.fr/#sans-trace sur chacun de ses appareils (navigateur par
+   navigateur) ; berao.fr/#avec-trace remet l'enregistrement. Le réglage reste dans le navigateur, pas sur le site. */
 (function () {
   'use strict';
 
@@ -16,7 +19,7 @@
   var R = {
     site: 'berao-bodega',                // le collecteur refuse tout ce qui ne porte pas ce nom
     envoi: 10,                           // un lot toutes les 10 secondes, s'il y a du nouveau
-    avis: 10,                            // l'avertissement reste 10 secondes ; rien n'est envoyé avant qu'il s'efface
+    avis: 0,                             // 0 : aucun avertissement, l'envoi commence tout de suite. 10 : un cartouche de 10 s avec « Refuser »
     accord: false,                       // true : on demande « OK / Non » et on n'enregistre qu'après un OK
     pas: 0.25,                           // un point de trajet au plus tous les quarts de seconde
     max: 3000                            // nombre d'actions au-delà duquel une visite n'est plus notée
@@ -39,6 +42,9 @@
     visite = { s: id, n: 0, b: 0, t0: Date.now(), ami: ami, ok: false };
   }
   function garder() { ecrire(sessionStorage, CLE, JSON.stringify(visite)); }
+  // #sans-trace : cet appareil ne s'enregistre plus (le propriétaire du site, par exemple) ; #avec-trace : il s'enregistre de nouveau
+  if (/sans-trace/.test(location.hash)) { ecrire(localStorage, REFUS, '1'); try { sessionStorage.removeItem(CLE); } catch (e) {} }
+  else if (/avec-trace/.test(location.hash)) { try { localStorage.removeItem(REFUS); } catch (e) {} }
   var refus = lire(localStorage, REFUS) === '1';
   var tactile = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   var bar = !!document.getElementById('stage');               // la page du bodega ; sinon, celle des archives
@@ -136,6 +142,7 @@
   }
   function avertir() {
     if (!ADRESSE || !actif || visite.ok) return;
+    if (!R.accord && !(R.avis > 0)) { visite.ok = true; garder(); return; }   // pas d'avertissement : rien à afficher
     document.head.appendChild(style);
     avis = document.createElement('div'); avis.id = 'trAvis'; avis.setAttribute('role', 'status');
     var hote = document.getElementById('stage');
@@ -158,7 +165,7 @@
   function ligne(e) { return mmss(e[1]) + '  ' + (e[2] ? '[' + e[2] + '] ' : '') + e[3] + (e[4] ? ' : ' + e[4] : ''); }
   function peindre() {
     if (!voir) return;
-    voir.textContent = (actif ? 'visite ' + visite.s + (visite.ami ? ' · ' + visite.ami : '') + (ADRESSE ? '' : ' · rien n\'est envoyé') : 'enregistrement refusé') +
+    voir.textContent = (actif ? 'visite ' + visite.s + (visite.ami ? ' · ' + visite.ami : '') + (ADRESSE ? '' : ' · rien n\'est envoyé') : 'cet appareil n\'est pas enregistré (berao.fr/#avec-trace pour le remettre)') +
       '\n' + tout.slice(-13).map(ligne).join('\n');
   }
   if (/trace/.test(location.hash)) {
