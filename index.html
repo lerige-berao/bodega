@@ -79,6 +79,29 @@ body {
   border: 1px solid var(--line);
   image-rendering: pixelated;
 }
+/* La mission, sous le plan : une case à cocher et sa ligne, dans le même cartouche que l'aide du bas.
+   Sur un écran étroit elle prend la largeur du plan et passe sur deux lignes, pour laisser la gauche aux panneaux. */
+#mission {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 5px 9px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  text-transform: uppercase;
+}
+#mission .case { width: 11px; height: 11px; flex: none; overflow: visible; }
+#mission .case rect { fill: none; stroke: var(--amber); stroke-width: 1; shape-rendering: crispEdges; }
+#mission .case path { fill: none; stroke: var(--amber); stroke-width: 1.7; stroke-linecap: square; shape-rendering: crispEdges; opacity: 0; }
+#mission.fait { color: var(--muted); }
+#mission.fait span { text-decoration: line-through; }
+#mission.fait .case path { opacity: 1; }
+#mission.vient .case { animation: coche 0.55s steps(5, end); }
+@keyframes coche { 0% { transform: scale(1); } 35% { transform: scale(1.9); } 100% { transform: scale(1); } }
+@media (max-width: 620px) { #mission { width: 134px; align-items: flex-start; } #mission .case { margin-top: 3px; } }
+@media (prefers-reduced-motion: reduce) { #mission.vient .case { animation: none; } }
 #hint {
   left: 50%;
   bottom: 22px;
@@ -248,10 +271,12 @@ body {
 /* Panneaux en papier (signal.js) : « Go pipi » centré en haut de l'écran, et l'annonce « New skill unlocked » juste dessous.
    Sur un écran étroit, le plan occupe le coin droit : « Go pipi » se range à gauche sous le titre, l'annonce passe sous le plan. */
 #stage .sig-annonce { top: 116px; }
+@media (max-width: 880px) { #stage .sig-annonce .sig { max-width: calc(100% - 456px); } }   /* l'annonce se resserre : elle ne touche ni le plan ni la mission */
 @media (max-width: 620px) {
   #stage .sig-boite:not(.sig-annonce) { top: 52px; left: max(12px, env(safe-area-inset-left, 0px)); right: 168px; align-items: flex-start; }
   #stage .sig-boite:not(.sig-annonce) .sig { max-width: 100%; }
-  #stage .sig-annonce { top: 168px; }
+  #stage .sig-annonce { top: 222px; }                           /* sous le plan et la ligne de mission */
+  #stage .sig-annonce .sig { max-width: 78%; }
 }
 </style>
 </head>
@@ -262,6 +287,7 @@ body {
   <div class="hud" id="side">
     <div id="fps">-- fps</div>
     <canvas id="map" width="132" height="120"></canvas>
+    <div id="mission" role="status"><svg class="case" viewBox="0 0 11 11" aria-hidden="true"><rect x="0.5" y="0.5" width="10" height="10"/><path d="M2.6 5.6 L4.7 7.8 L8.5 3"/></svg><span>Find the archive room</span></div>
   </div>
   <div class="hud" id="hint"></div>
   <button id="use" type="button" hidden>Utiliser le juke-box</button>
@@ -3054,6 +3080,17 @@ body {
     window.location.href = ARCH_PAGE;
   }
   // Retour des archives (lien de la page, ou bouton « page précédente » du navigateur) : devant la porte, dos à elle
+  /* ---------- Mission ---------- */
+  // « Find the archive room » : la case se coche quand on se trouve devant la porte (le bouton « Enter the archive room? »
+  // apparaît), et elle reste cochée quand on revient des archives.
+  var MISSION = { fait: false, el: document.getElementById('mission') };
+  function missionFaite(discret) {                               // discret : sans le petit sursaut de la case (au retour des archives)
+    if (MISSION.fait) return;
+    MISSION.fait = true;
+    MISSION.el.classList.add('fait');
+    if (!discret) MISSION.el.classList.add('vient');
+    MISSION.el.setAttribute('aria-label', 'Find the archive room : done');
+  }
   window.addEventListener('pageshow', function (ev) { if (ev.persisted && ARCH.parti) location.reload(); });
   (function () {
     var r = null, i;
@@ -3061,6 +3098,7 @@ body {
     if (!r || r.lieu !== 'archives') return;
     if (r.boum) { BOOM.silence = true; suivreBoom(0); exploser(); for (i = 0; i < 320; i++) suivreBoom(0.05); BOOM.silence = false; }   // le juke-box avait déjà sauté
     if (r.pipi) debloquerPipi(true);
+    missionFaite(true);
     pos.x = ARCH.x + ARCH.nx * 0.5; pos.z = ARCH.z + ARCH.nz * 0.5; yaw = ARCH.rot + Math.PI * 0.62; pitch = 0;
     used();
   })();
@@ -3109,6 +3147,7 @@ body {
     canUse = !busy && nearJuke();
     var want = canUse ? 'juke' : (!busy && biereVisee()) ? 'boire' : null;   // une bière pleine devant soi : on la boit avant d'en commander une autre
     if (!want && !busy && nearArchive()) want = 'archive';      // devant la porte des archives (elle passe avant le patron, qui est juste derrière)
+    if (want === 'archive') missionFaite(false);
     if (!want && !busy) {
       // La télécommande est posée devant le Danois assis : elle garde la main, comme avant, sauf si on regarde franchement
       // le Danois (son buste à moins de 26° du centre de l'image, et nettement plus près du centre que la télécommande).
@@ -3155,7 +3194,7 @@ body {
     requestAnimationFrame(frame);
   }
   // Petit accès pour les essais : placer la caméra
-  window.bodega = { ARCH: ARCH, entrerArchives: entrerArchives, presArchives: nearArchive, archivesIci: archivesIci, noterRetour: noterRetour, cam: function (x, z, y, p) { pos.x = x; pos.z = z; yaw = y; pitch = p || 0; }, P: P, colliders: colliders, radius: RADIUS, barman: barman, assis: assis, BARMAN: BARMAN, COUPLE: COUPLE, JUKE: JUKE, BOOM: BOOM, exploser: exploser, lueur: function () { return jukeLight.intensity; }, SKILL: SKILL, pipiLibre: function () { debloquerPipi(true); }, surCarreaux: surCarreaux, signaux: function () { return signaux; }, annonces: function () { return annonces; }, voix: function () { return voixCtx; }, BOIRE: BOIRE, biereVisee: biereVisee, mainBiere: mainBiere, pnjVise: pnjVise, utiliser: utiliser, use: function () { return useFor; }, pipi: pipi, tireuse: tireuse,
+  window.bodega = { ARCH: ARCH, entrerArchives: entrerArchives, presArchives: nearArchive, archivesIci: archivesIci, noterRetour: noterRetour, cam: function (x, z, y, p) { pos.x = x; pos.z = z; yaw = y; pitch = p || 0; }, P: P, colliders: colliders, radius: RADIUS, barman: barman, assis: assis, BARMAN: BARMAN, COUPLE: COUPLE, JUKE: JUKE, BOOM: BOOM, exploser: exploser, lueur: function () { return jukeLight.intensity; }, SKILL: SKILL, MISSION: MISSION, pipiLibre: function () { debloquerPipi(true); }, surCarreaux: surCarreaux, signaux: function () { return signaux; }, annonces: function () { return annonces; }, voix: function () { return voixCtx; }, BOIRE: BOIRE, biereVisee: biereVisee, mainBiere: mainBiere, pnjVise: pnjVise, utiliser: utiliser, use: function () { return useFor; }, pipi: pipi, tireuse: tireuse,
     tele: { etat: function () { return tele.etat; }, ouvrir: openTele, fermer: closeTele, TELE: TELE, MAIN: MAIN, feuille: feuille, pres: nearRemote, surEcran: surEcran, vue: function () { return tele.view; } },
     view: function () { return { x: pos.x, z: pos.z, yaw: yaw, pitch: pitch, drawer: drawerU }; },
     // écart, en pixels, entre la façade du juke-box 3D vue par la caméra et le cadre du mini-jeu
