@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BERAO Archive Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&display=swap" rel="stylesheet">
+<style>
+/* Mise en page : une seule colonne de liens en capitales grasses sur fond noir, calée à gauche. Un index, rien d'autre.
+   Un seul look, sombre, assumé : la pièce derrière la porte du bodega est noire. */
+:root {
+  color-scheme: dark;
+  --fond: #000;
+  --titre: #ff9a2e;
+  --accroche: #ff3fae;
+  --lien: #ffe433;
+  --retour: #ff2d21;
+  --pale: #7d7768;
+  --texte: 800 clamp(18px, 4.7vw, 27px)/1.34 Archivo, "Arial Black", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--fond); }
+body {
+  margin: 0; background: var(--fond); color: var(--lien);
+  font: var(--texte); text-transform: uppercase; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+main {
+  max-width: 1100px;
+  padding-block: clamp(48px, 11vh, 150px) 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px), 12.8vw);
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, p, ul { margin: 0; padding: 0; font: inherit; }
+h1 { color: var(--titre); }
+.accroche { color: var(--accroche); }
+nav { display: flex; flex-direction: column; align-items: flex-start; }
+details { max-width: 100%; }
+a, summary { display: block; max-width: 100%; color: inherit; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+summary { list-style: none; }
+summary::-webkit-details-marker { display: none; }
+a::before, summary::before { content: "> "; }
+a:hover, summary:hover { text-decoration: underline; text-decoration-thickness: 0.11em; text-underline-offset: 0.12em; }
+a:focus-visible, summary:focus-visible { outline: 3px solid currentColor; outline-offset: 4px; }
+/* le contenu d'une étagère : plus petit, en retrait */
+details ul { list-style: none; padding: 0.45em 0 0.8em 1.1em; font-size: 0.72em; line-height: 1.78; }
+.vide { color: var(--pale); }
+.retour { color: var(--retour); margin-top: 0.05em; }
+/* les lignes arrivent l'une après l'autre, comme un index qui s'affiche ; au repos, tout est là */
+.ligne { animation: arrive 0.32s ease-out both; animation-delay: calc(var(--i, 0) * 70ms + 120ms); }
+@keyframes arrive { from { opacity: 0; transform: translateY(0.35em); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ligne { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="ligne" style="--i:0">BERAO * Archive room</h1>
+  <p class="accroche ligne" style="--i:1">Kept behind the bar of the bodega</p>
+
+  <!-- Une étagère = un bloc <details>. Pour la remplir : remplacer la ligne « vide » par des lignes
+       <li><a href="ADRESSE" target="_blank" rel="noopener noreferrer">TITRE</a></li>
+       Pour ajouter une étagère : copier un bloc <details> entier. -->
+  <nav aria-label="Archives">
+    <details class="ligne" style="--i:2">
+      <summary>Nap archives</summary>
+      <ul>
+        <li class="vide">Nothing filed here yet</li>
+      </ul>
+    </details>
+    <details class="ligne" style="--i:3">
+      <summary>Vidéo archives</summary>
+      <ul>
+        <li class="vide">Nothing filed here yet</li>
+      </ul>
+    </details>
+    <details class="ligne" style="--i:4">
+      <summary>Best</summary>
+      <ul>
+        <li class="vide">Nothing filed here yet</li>
+      </ul>
+    </details>
+    <a class="retour ligne" style="--i:5" id="retour" href="../index.html">Back to the bodega</a>
+  </nav>
+</main>
+<script>
+// Le retour au bodega. La page du bar a noté son adresse en partant ; si la page des archives a été affichée
+// à sa place (sans changement de page), il suffit de la recharger.
+(function () {
+  var a = document.getElementById('retour'), url = null;
+  try {
+    var r = JSON.parse(sessionStorage.getItem('bodega-retour') || 'null');
+    if (r && r.page && new URL(r.page, location.href).origin === location.origin) url = r.page;
+  } catch (e) {}
+  if (document.body.getAttribute('data-ici')) a.addEventListener('click', function (e) { e.preventDefault(); location.reload(); });
+  else if (url) a.href = url;
+})();
+</script>
+</body>
+</html>
