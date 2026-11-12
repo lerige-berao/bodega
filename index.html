@@ -3881,8 +3881,10 @@ function paintFace() {
 //   close() : retour demandé (état 'leave'),                   gone()  : la caméra est revenue (état 'room', mini-jeu caché)
 //   face()  : repeint et renvoie l'image de la façade ; faceVersion change quand elle doit être relue
 window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, clack: () => sfx.clack(),
-  get state() { return state; }, get column() { return col; }, get drawerOpen() { return drawerUnlocked; }, get faceVersion() { return faceVersion; } };
+  get state() { return state; }, get column() { return col; }, get drawerOpen() { return drawerUnlocked; }, get faceVersion() { return faceVersion; },
+  get selection() { return sel; }, get titre() { const cd = CDS[sel - 1]; return cd ? cdName(cd) : ''; } };   // le CD choisi (0 : aucun) et son nom
 })();
 </script>
+<script src="trace.js"></script>   <!-- le journal de visite : voir trace.js -->
 </body>
 </html>
