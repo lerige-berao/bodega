@@ -212,10 +212,11 @@ var PIPI = (function () {
     /* ---------- Simulation ---------- */
     function simuler(dt, p) {
       var i, k;
+      if (!(dt > 0)) dt = 0;                                        // le temps ne recule jamais : un pas négatif faisait monter la pression tout seul
       temps += dt;
       if (colliders) ranger();
       if (ouvert) { duree += dt; if (aFermer && duree >= 0.5) ouvert = false; }
-      pression = ouvert ? Math.min(1, pression + dt / 0.25) : Math.max(0, pression - dt / 0.4);
+      pression = Math.max(0, Math.min(1, ouvert ? pression + dt / 0.25 : pression - dt / 0.4));
       if (p) {
         jx = p.pos ? p.pos.x : p.x; jz = p.pos ? p.pos.z : p.z;
         if (regard > 0 && BAISSER && p.pitch !== undefined) {       // au début du jet, on baisse les yeux pour le voir

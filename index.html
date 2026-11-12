@@ -1766,7 +1766,7 @@ body {
     window.addEventListener(ev, function () { if (voixCtx.state === 'suspended') { try { voixCtx.resume(); } catch (e) {} } }, true);
   });
   if (window.PNJ) {
-    window.PNJ.init({ THREE: THREE, scene: scene, camera: camera, colliders: colliders, dossier: 'pnj/', audio: voixCtx,
+    window.PNJ.init({ THREE: THREE, scene: scene, camera: camera, colliders: colliders, dossier: 'pnj-', audio: voixCtx,
       // la bouteille qu'il sert : le modèle de l'atelier « Modèle 3D style PS1 », teinté comme les PNJ par la lumière du bar
       bouteille: function () { return window.MODELES ? window.MODELES.creer(THREE, 'bouteille', { teinte: [0.85, 0.78, 0.64] }) : null; } });
     // Le patron, debout derrière le comptoir : il essuie un verre, s'appuie au comptoir, pose une main sur la hanche.
@@ -1970,8 +1970,8 @@ body {
   if (window.SIGNAL) (function () {
     // Deux boîtes, pour que l'annonce ne déplace jamais « GO PIPI » : chacune ne reçoit que son panneau
     var Pn = window.SIGNAL.panneaux, ns = Pn['new-skill'], gp = Pn['go-pipi'];
-    delete Pn['new-skill']; signaux = window.SIGNAL.creer({ ecran: stage });
-    Pn['new-skill'] = ns; delete Pn['go-pipi']; annonces = window.SIGNAL.creer({ ecran: stage }); Pn['go-pipi'] = gp;
+    delete Pn['new-skill']; signaux = window.SIGNAL.creer({ ecran: stage, dossier: 'signal-' });
+    Pn['new-skill'] = ns; delete Pn['go-pipi']; annonces = window.SIGNAL.creer({ ecran: stage, dossier: 'signal-' }); Pn['go-pipi'] = gp;
     annonces.boite.classList.add('sig-annonce');
   })();
   function goPipi() { SKILL.bu = true; if (signaux && !signaux.visible('go-pipi')) signaux.montrer('go-pipi'); }
@@ -2019,7 +2019,7 @@ body {
   };
   var mainBiere = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xe6d6bd, alphaTest: 0.5, fog: false, side: THREE.DoubleSide }));
   mainBiere.visible = false; camera.add(mainBiere);
-  photoTex('tele/main.png', 0, function (t, ratio) {
+  photoTex('tele-main.png', 0, function (t, ratio) {
     mainBiere.material.map = t; mainBiere.material.needsUpdate = true;
     mainBiere.scale.set(BOIRE.main.h * ratio, BOIRE.main.h, 1); BOIRE.ratio = ratio; BOIRE.pret = true;
   });
@@ -2833,7 +2833,7 @@ body {
     top.rotation.order = 'YXZ'; top.rotation.set(-Math.PI / 2, REMOTE.ry, 0);
     top.position.set(REMOTE.c[0], y + 0.0195, REMOTE.c[1]);
     scene.add(top); REMOTE.parts.push(top);
-    photoTex('tele/telecommande.png', 48, function (t) { top.material = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, color: 0xd8c6a4 }); });
+    photoTex('tele-telecommande.png', 48, function (t) { top.material = new THREE.MeshBasicMaterial({ map: t, alphaTest: 0.5, color: 0xd8c6a4 }); });
   })();
   function nearRemote() {                                        // à portée de main de la télécommande, et tourné vers elle
     var dx = REMOTE.c[0] - pos.x, dz = REMOTE.c[1] - pos.z, d = Math.sqrt(dx * dx + dz * dz);
@@ -2845,8 +2845,8 @@ body {
   // Réglages en demi-hauteurs d'écran à partir de ce coin : h hauteur, x et y centre, rot rotation en degrés.
   // penche bascule la feuille vers le fond (le haut de la télécommande part vers la télé) ; tourne la fait pivoter comme une porte.
   var MAIN = {
-    main:         { src: 'tele/main.png',         h: 1.58, x: -0.56, y: 0.62, rot: 197 },   // paume vers nous, doigts en haut à gauche
-    telecommande: { src: 'tele/telecommande.png', h: 1.30, x: -0.63, y: 0.85, rot: 17 },    // posée dans la paume, pointée vers la télé
+    main:         { src: 'tele-main.png',         h: 1.58, x: -0.56, y: 0.62, rot: 197 },   // paume vers nous, doigts en haut à gauche
+    telecommande: { src: 'tele-telecommande.png', h: 1.30, x: -0.63, y: 0.85, rot: 17 },    // posée dans la paume, pointée vers la télé
     pivot: { x: -0.56, y: 0.62 }, tourne: 0, penche: 24, decale: { x: 0, y: 0 }, taille: 0.58
   };
   var mainGrp = new THREE.Group(), feuille = new THREE.Group(), mainU = 0, mainLeve = 0;   // mainU : 0 = rangée sous l'image, 1 = en place
@@ -2994,7 +2994,7 @@ body {
      Derrière le bar, la porte « ARKIV ». Devant elle, le bouton propose d'entrer. Si on accepte : la caméra se met dans l'axe,
      la porte s'ouvre lentement sur du noir, la caméra avance dedans, l'écran devient noir, puis on passe à la page des
      archives (archive.html). Au retour, on se retrouve devant la porte, le bar dans l'état où on l'avait laissé. */
-  var ARCH_PAGE = location.protocol === 'file:' ? 'archive/index.html' : 'archive/';   // sur le site : berao.fr/archive/
+  var ARCH_PAGE = 'archive.html';
   var ARCH_T = CALM ? { axe: 0.01, porte0: 0.01, porte: 0.02, avance0: 0.03, avance: 0.3, noir0: 0.03, noir: 0.3, fin: 0.4 }
                     : { axe: 0.8, porte0: 0.45, porte: 2.6, avance0: 2.3, avance: 2.0, noir0: 3.5, noir: 0.7, fin: 4.35 };   // secondes
   var archNoir = document.getElementById('archNoir');
@@ -3068,7 +3068,9 @@ body {
   /* ---------- Boucle ---------- */
   var fpsEl = document.getElementById('fps'), frames = 0, acc = 0, prev = performance.now();
   function frame(now) {
-    var dt = Math.min(0.05, (now - prev) / 1000); prev = now;
+    // Le navigateur date chaque image de son début : la toute première peut donc porter une heure antérieure à la fin de ce
+    // script. Sans plancher à zéro, le temps reculait d'un cran au lancement, et un petit jet de pipi partait tout seul.
+    var dt = Math.max(0, Math.min(0.05, (now - prev) / 1000 || 0)); prev = now;
     if (ARCH.fini) return;                                       // la page des archives a pris la place de la salle : on arrête de dessiner
     var js = jbState(), jbOpen = js !== 'room';
     if (stage.classList.contains('playing') !== jbOpen) stage.classList.toggle('playing', jbOpen);
