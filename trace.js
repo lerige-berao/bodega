@@ -338,6 +338,11 @@
     window.addEventListener('keydown', function (e) { if ((e.code === 'KeyE' || e.code === 'Enter') && !e.repeat) parle(); }, true);
     var use = document.getElementById('use');
     if (use) use.addEventListener('click', parle, true);
+    var yt = document.getElementById('tvLien');                // le lien « Voir sur YouTube » sous la télé
+    if (yt) yt.addEventListener('click', function () {
+      var tv = null; try { tv = window.bodega.tele.TELE.etat(); } catch (e) {}
+      noter('télé', 'ouvre le lien YouTube' + (tv ? ' de la chaîne ' + tv.chaine + (tv.nom ? ' (' + tv.nom + ')' : '') : ''), 'lien YouTube');
+    });
     [['hSpotify', 'Spotify'], ['hDeezer', 'Deezer'], ['hInstagram', 'Instagram']].forEach(function (l) {
       var el = document.getElementById(l[0]);
       if (el) el.addEventListener('click', function () { var J = window.Jukebox; noter('juke-box', 'ouvre le lien ' + l[1] + (J && J.selection ? ' du ' + cd(J) : ''), 'lien ' + l[1]); });

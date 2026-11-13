@@ -192,6 +192,14 @@ body {
 #tvPower { min-width: 38px; width: 38px; padding: 0; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff7a61, #e0452d 60%, #8f2415); }
 #tvPower svg { display: block; margin: auto; }
 #tvAdd { background: linear-gradient(#c7a252, #93732f); color: #1c1408; border-color: #3b2c0d; }
+#tvLien { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 14px; max-width: 100%; padding: 7px 14px 6px; border-radius: 10px;
+  font: 400 22px/1.05 VT323, "Courier New", monospace; letter-spacing: .04em; color: var(--osd); text-decoration: none; text-align: center;
+  background: rgba(8, 10, 8, .9); border: 1px solid #000; box-shadow: 0 1px 0 var(--plastic-hi) inset, 0 6px 18px rgba(0, 0, 0, .55); cursor: pointer; }
+#tvLien[hidden] { display: none; }
+#tvLien .nm { min-width: 0; overflow-wrap: anywhere; }
+#tvLien .ou { color: #fff; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+#tvLien:hover .ou { color: var(--osd); }
+#tvLien:focus-visible { outline: 2px solid var(--osd); outline-offset: 2px; }
 #tvDock .sep { width: 1px; height: 26px; background: #000; box-shadow: 1px 0 0 var(--plastic-hi); }
 #tvDrawer { width: min(340px, 100%); max-height: min(55vh, 420px); overflow: auto; padding: 12px 12px 10px; border-radius: 14px;
   background: rgba(24, 19, 15, .96); border: 1px solid #000; box-shadow: 0 1px 0 var(--plastic-hi) inset, 0 10px 30px rgba(0, 0, 0, .7); }
@@ -304,6 +312,7 @@ body {
       <ol id="tvList"></ol>
       <p class="keys">Clavier : ← → pour zapper, 1 à 9 pour une chaîne, M muet, P marche/arrêt, + et − pour le volume, Échap pour te lever. Tu peux aussi glisser le doigt sur l'image, toucher l'écran de la télé, ou déposer un fichier vidéo sur la page.</p>
     </section>
+    <a id="tvLien" hidden target="_blank" rel="noopener noreferrer"><span class="nm"></span><span class="ou">Voir sur YouTube ↗</span></a>
     <div id="tvRemote" role="toolbar" aria-label="Télécommande">
       <button id="tvPower" type="button" aria-label="Allumer ou éteindre la télé">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 2v6"/><path d="M5 4.6a6 6 0 1 0 8 0"/></svg>
@@ -1652,6 +1661,18 @@ body {
   }
   useBtn.textContent = USE_LABEL.juke;
   function jbState() { return window.Jukebox ? window.Jukebox.state : 'room'; }
+  // La musique du juke-box entendue depuis la salle : devant la façade elle est à plein volume ; plus on s'éloigne, plus elle
+  // baisse et s'étouffe. Aux toilettes elle passe à travers la cloison ; devant la télé allumée, elle s'efface derrière elle.
+  function ecouteJuke() {
+    var M = window.Jukebox && window.Jukebox.musique;
+    if (!M || !M.cd) return;
+    if (jbState() !== 'room') { M.ecoute(1, 20000); return; }
+    var dx = pos.x - JUKE.x, dz = pos.z - JUKE.z, d = Math.sqrt(dx * dx + dz * dz);
+    var v = Math.max(0.14, 1 / (1 + (d / 3.2) * (d / 3.2))), hz = Math.max(1200, 20000 / (1 + (d / 2.2) * (d / 2.2)));
+    if (surCarreaux()) { v *= 0.5; hz = Math.min(hz, 800); }
+    if (tele.etat !== 'salle') { var tv = TELE.etat(); if (tv.power && !tv.muted) v *= 0.3; }
+    M.ecoute(v, hz);
+  }
   function nearJuke() {                                          // à moins de 1,30 m du meuble, et tourné vers lui
     if (!JUKE.vivant) return false;                              // il a explosé
     var dx = JUKE.x - pos.x, dz = JUKE.z - pos.z, d = Math.sqrt(dx * dx + dz * dz);
@@ -2287,6 +2308,7 @@ body {
     preparerBoom();
     var B = BOOM, J = B.lieu, i, a, v, big;
     JUKE.vivant = false; B.t = 0; B.mouille = 0;
+    if (window.Jukebox && window.Jukebox.musique) window.Jukebox.musique.arreter(true);   // le disque en cours meurt avec la platine
     // Le juke-box, son meuble et leurs obstacles disparaissent ; le dos et le bout du pan ouest du comptoir laissent passer une personne
     JUKE.pieces.forEach(function (m) { scene.remove(m); });
     JUKE.cols.concat(JUKE.barrieres).forEach(function (c) { var k = colliders.indexOf(c); if (k >= 0) colliders.splice(k, 1); });
@@ -2406,6 +2428,14 @@ body {
      Repris de la scène « Télé de la bodega » : mêmes chaînes intégrées, même neige au zapping, même affichage à l'écran,
      même volume, mêmes vidéos qu'on dépose et qui restent enregistrées avec la page quand c'est possible.
      La télé est allumée en permanence dans la salle. Le son, lui, ne s'entend que lorsqu'on est assis devant. */
+  // Les chaînes du site. Chacune a deux fichiers posés à côté de la page :
+  //   la boucle (tv-01-boucle.jpg) : une planche de 48 petites images, 8 par rangée, qui tourne sur la télé comme un GIF
+  //     (8 images par seconde) tant qu'on est debout dans le bar ; elle est légère et se charge avec la page ;
+  //   la vidéo (tv-01.mp4) : le clip entier, avec le son, qui ne se charge que lorsqu'on s'assoit devant la télé.
+  // Pour une nouvelle chaîne : ajouter une ligne avec son nom et le lien vers la version complète.
+  var TELE_CHAINES = [
+    { fichier: 'tv-01.mp4', boucle: 'tv-01-boucle.jpg', nom: 'JODENJI - BIGVOL (FT. ALIOCHA)', lien: 'https://youtu.be/JQlYuhWJyC0' }
+  ];
   var TELE = (function () {
     function $(id) { return document.getElementById(id); }
     var store = {
@@ -2514,6 +2544,11 @@ body {
     ];
     var videos = [], current = builtins[0], userZapped = false;
     function list() { return videos.concat(builtins); }
+    function syncLien() {                                         // sous l'écran : le nom de la chaîne et son lien, quand elle en a un
+      var a = $('tvLien'), ok = power && current.kind === 'video' && !!current.lien;
+      a.hidden = !ok;
+      if (ok) { a.href = current.lien; a.firstChild.textContent = '▶ ' + current.name; }
+    }
 
     /* ---------- vidéos ---------- */
     function cleanName(n) {
@@ -2521,9 +2556,9 @@ body {
       return n.slice(0, 28) || 'VIDÉO';
     }
     function silent() { return muted || !gesture || !seated; }      // le son ne sort que quand on est assis devant la télé
-    function addVideo(url, name, assetId, blobUrl) {
+    function addVideo(url, name, assetId, blobUrl, paresseux) {
       var v = document.createElement('video');
-      v.playsInline = true; v.setAttribute('playsinline', ''); v.loop = true; v.muted = true; v.preload = 'metadata'; v.src = url;
+      v.playsInline = true; v.setAttribute('playsinline', ''); v.loop = true; v.muted = true; v.preload = paresseux ? 'none' : 'metadata'; v.src = url;
       $('tvVault').appendChild(v);
       var ch = { kind: 'video', name: name, el: v, assetId: assetId || null, blobUrl: blobUrl || null,
                  t0: performance.now(), state: assetId ? 'saved' : 'session', broken: false, sure: false };
@@ -2588,8 +2623,13 @@ body {
       }
       if (now < staticUntil) { drawNoise(g, 0); }
       else if (current.kind === 'video') {
-        var v = current.el;
+        var v = current.el, bo = current.boucle && current.boucle.img.complete && current.boucle.img.naturalWidth ? current.boucle : null;
         if (current.broken) { drawNoise(g, 0.4); plate(g, ['FICHIER ILLISIBLE'], 34); }
+        else if (bo && !(seated && v.readyState >= 2 && v.videoWidth)) {
+          var nb = CALM ? 0 : Math.floor(now / 1000 * bo.ips) % bo.n, lw = bo.img.naturalWidth / bo.col, lh = bo.img.naturalHeight / Math.ceil(bo.n / bo.col);
+          g.fillStyle = '#000'; g.fillRect(0, 0, SW, SH);
+          try { g.drawImage(bo.img, (nb % bo.col) * lw, Math.floor(nb / bo.col) * lh, lw, lh, 0, 0, SW, SH); } catch (e) {}
+        }
         else if (v.readyState >= 2 && v.videoWidth) {
           g.fillStyle = '#000'; g.fillRect(0, 0, SW, SH);
           var r = Math.min(SW / v.videoWidth, SH / v.videoHeight), dw = v.videoWidth * r, dh = v.videoHeight * r;
@@ -2600,7 +2640,7 @@ body {
       if (now < osdUntil) {
         var i = list().indexOf(current) + 1;
         txt(g, pad(i), SW - 16, 6, 72, '#6dff7a', 'right');
-        txt(g, current.name.slice(0, 24), SW - 16, 70, 30, '#6dff7a', 'right');
+        txt(g, current.name.slice(0, 34), SW - 16, 70, 30, '#6dff7a', 'right');
       }
       if (seated && current.kind === 'video' && (muted || !gesture)) txt(g, muted ? 'MUET' : "SON : TOUCHE L'ECRAN", 14, 8, 30, '#ff6a55', 'left');
       if (now < volUntil && !muted) {
@@ -2631,7 +2671,7 @@ body {
     // Assis : 30 images par seconde. Dans la salle : une douzaine, et rien du tout quand on lui tourne le dos.
     function tick(now, visible) {
       if (current.kind === 'video' && power) {                      // la vidéo ne tourne que si quelqu'un peut la voir
-        if (seated || visible) { if (current.el.paused && !current.broken) playCurrent(); }
+        if ((current.fixe ? seated : (seated || visible)) && document.visibilityState !== 'hidden') { if (current.el.paused && !current.broken) playCurrent(); }   // une chaîne du site : sa vidéo ne tourne qu'assis
         else if (!current.el.paused) current.el.pause();
       }
       if (!dirty) {
@@ -2653,10 +2693,11 @@ body {
       clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, bref ? 3500 : 6500);
     }
     function syncButtons() {
+      syncLien();
       $('tvMute').setAttribute('aria-pressed', String(muted));
       $('tvPower').setAttribute('aria-label', power ? 'Éteindre la télé' : 'Allumer la télé');
     }
-    var TAGS = { saved: 'gardée', saving: 'envoi…', session: 'cette session' };
+    var TAGS = { saved: 'gardée', saving: 'envoi…', session: 'cette session', site: '' };
     function renderList() {
       var ol = $('tvList'), l = list();
       var hadFocus = ol.contains(document.activeElement) ? Array.prototype.indexOf.call(ol.querySelectorAll('.ch'), document.activeElement) : -1;
@@ -2668,13 +2709,13 @@ body {
         var num = document.createElement('span'); num.className = 'num'; num.textContent = pad(i + 1);
         var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = ch.name;
         b.appendChild(num); b.appendChild(nm);
-        if (ch.kind === 'video') {
+        if (ch.kind === 'video' && (ch.broken || TAGS[ch.state])) {
           var tag = document.createElement('span'); tag.className = 'tag';
           tag.textContent = ch.broken ? 'illisible' : TAGS[ch.state]; b.appendChild(tag);
         }
         b.addEventListener('click', function () { userZapped = true; tune(ch); });
         li.appendChild(b);
-        if (ch.kind === 'video') {
+        if (ch.kind === 'video' && !ch.fixe) {                      // les chaînes du site ne se retirent pas
           var rm = document.createElement('button'); rm.type = 'button'; rm.className = 'rm' + (ch.sure ? ' sure' : '');
           rm.textContent = ch.sure ? 'Retirer ?' : '×';
           rm.setAttribute('aria-label', ch.sure ? 'Confirmer : retirer ' + ch.name : 'Retirer la chaîne ' + ch.name);
@@ -2691,6 +2732,29 @@ body {
     function closeDrawer() { $('tvDrawer').hidden = true; $('tvListBtn').setAttribute('aria-expanded', 'false'); }
 
     /* ---------- stockage des vidéos avec la page (quand il est disponible) ---------- */
+    // Les chaînes du site passent d'abord. La première est à l'antenne dès l'arrivée : debout dans le bar, on voit sa
+    // boucle ; sa vidéo ne se charge que lorsqu'on s'assoit (voir tick).
+    TELE_CHAINES.forEach(function (c) {
+      var ch = addVideo(c.fichier, c.nom, null, null, true);
+      ch.state = 'site'; ch.fixe = true; ch.lien = /^https:\/\//.test(c.lien || '') ? c.lien : null;
+      if (c.boucle) {
+        ch.boucle = { img: new Image(), n: c.images || 48, col: c.colonnes || 8, ips: c.ips || 8 };
+        ch.boucle.img.onload = function () { dirty = true; }; ch.boucle.img.src = c.boucle;
+      }
+      // une chaîne dont la vidéo n'est pas posée à côté de la page disparaît de la liste, sans bruit
+      if (window.fetch && location.protocol !== 'file:') fetch(c.fichier, { method: 'HEAD' }).then(function (rep) { if (rep.status === 404) oublier(ch); }, function () {});
+    });
+    function oublier(ch) {
+      var i = videos.indexOf(ch); if (i < 0) return;
+      if (ch.el.parentNode) ch.el.parentNode.removeChild(ch.el);
+      videos.splice(i, 1);
+      if (current === ch) { current = videos[0] || builtins[0]; dirty = true; }
+      renderList(); syncLien();
+    }
+    if (videos.length) { current = videos[0]; renderList(); syncLien(); }
+    document.addEventListener('visibilitychange', function () {  // l'onglet passe derrière (le lien YouTube vient de s'ouvrir, par exemple) : la télé se tait
+      if (document.visibilityState === 'hidden' && current.kind === 'video' && !current.el.paused) current.el.pause();
+    });
     var assetsNS = null;
     var assetsReady = (async function () {
       try {
@@ -2819,13 +2883,14 @@ body {
 
     return {
       tick: tick, key: key, geste: geste, toast: toast, tune: tune, step: step, list: list, setPower: setPower, addFiles: addFiles, screenCanvas: screenCanvas,
-      etat: function () { return { power: power, muted: muted, volume: volume, chaine: list().indexOf(current) + 1, nom: current.name, assis: seated }; },
+      etat: function () { return { power: power, muted: muted, volume: volume, chaine: list().indexOf(current) + 1, nom: current.name, assis: seated,
+          image: current.kind !== 'video' ? 'mire' : (current.boucle && current.boucle.img.naturalWidth && !(seated && current.el.readyState >= 2)) ? 'boucle' : 'vidéo' }; },
       quitter: function (fn) { onLeave = fn; },
       // S'asseoir devant la télé ou s'en lever : la télécommande à boutons apparaît, le son sort
       asseoir: function (on) {
         seated = on; $('tvDock').hidden = !on; if (!on) closeDrawer();
         if (current.kind === 'video') current.el.muted = silent();
-        if (on) osdUntil = performance.now() + 2800;
+        if (on) { osdUntil = performance.now() + 2800; if (current.fixe && !CALM) staticUntil = performance.now() + 230; }   // on s'installe : un peu de neige, puis le clip
         dirty = true;
       }
     };
@@ -3155,6 +3220,7 @@ body {
       if (vPnj && (vTele === -2 || (vPnj[1] >= 0.9 && vPnj[1] > vTele + 0.03))) want = vPnj[0] === barman ? 'biere' : 'parler';
       else if (vTele > -2) want = 'tele';
     }
+    ecouteJuke();
     if (want !== useFor) { useFor = want; if (want) useBtn.textContent = USE_LABEL[want]; }
     if (useBtn.hidden === !!want) useBtn.hidden = !want;
     if (view) { camera.position.set(view.x, view.y, view.z); camera.rotation.y = view.yaw; camera.rotation.x = view.pitch; }
@@ -3421,9 +3487,10 @@ const root = $('jb');                  // le calque du mini-jeu, posé par-dessu
 /* ---------- sons (synthétisés, aucun fichier) ---------- */
 const sfx = (() => {
   let ac = null, on = true, nbuf = null;
-  function actx() { if (!on) return null;
+  function contexte() {
     try { if (!ac) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; ac = new AC(); }
       if (ac.state === 'suspended') ac.resume().catch(() => {}); return ac; } catch (e) { return null; } }
+  function actx() { return on ? contexte() : null; }
   function tone(f, d, type, vol, f2) { const a = actx(); if (!a) return;
     try { const o = a.createOscillator(), v = a.createGain(), t0 = a.currentTime; o.type = type || 'square';
       o.frequency.setValueAtTime(f, t0); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d);
@@ -3443,7 +3510,93 @@ const sfx = (() => {
     clack() { burst(.08, 1500, .14); },
     whirr(d){ tone(70, d, 'sawtooth', .03, 220); },
     land()  { burst(.1, 500, .16); tone(880, .3, 'triangle', .05, 1320); },
-    set on(v) { on = v; }, get on() { return on; },
+    set on(v) { on = v; }, get on() { return on; }, contexte,
+  };
+})();
+
+/* ---------- musique : un extrait par CD, dans un fichier posé à côté de la page ---------- */
+// cd-01.mp3 pour le CD 01, cd-02.mp3 pour le CD 02… Un CD sans fichier reste muet, sans erreur.
+// Le juke-box garde le dernier CD choisi à l'antenne : son extrait tourne en boucle pendant qu'on feuillette, et continue
+// dans la salle quand on quitte l'écran. Là, c'est la salle qui règle l'écoute selon la distance (musique.ecoute).
+const MUSIQUE = {
+  fichier: n => 'cd-' + pad(n) + '.mp3',
+  volume: 0.85,                        // volume devant le juke-box (0 à 1)
+  fondu: 0.5                           // secondes de fondu à l'arrivée d'un disque
+};
+const musique = (() => {
+  let el = null, ctx = null, gFondu = null, filtre = null, gEspace = null;   // l'élément audio, puis fondu -> filtre (étouffement) -> espace (distance) -> sortie
+  let cd = 0, pret = 0, muet = false, retenue = false, chute = 0, niveau = 0, envoye = '';
+  const absent = {}, cible = { v: 1, hz: 20000 };
+  function jouer() { try { const p = el.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  function monter() {
+    if (el) return;
+    el = new Audio(); el.loop = true; el.preload = 'auto';
+    el.addEventListener('error', () => { if (pret) absent[pret] = true; if (cd === pret) cd = 0; pret = 0; el.pause(); });   // pas de fichier pour ce CD : il reste muet
+    ctx = sfx.contexte();
+    if (ctx) {
+      try {
+        const src = ctx.createMediaElementSource(el);
+        gFondu = ctx.createGain(); filtre = ctx.createBiquadFilter(); gEspace = ctx.createGain();
+        filtre.type = 'lowpass'; filtre.frequency.value = 20000; gFondu.gain.value = 0; gEspace.gain.value = MUSIQUE.volume;
+        src.connect(gFondu); gFondu.connect(filtre); filtre.connect(gEspace); gEspace.connect(ctx.destination);
+      } catch (e) { ctx = null; }
+    }
+    if (!ctx) el.volume = 0;
+  }
+  function regler() {                  // la distance et l'étouffement demandés par la salle, et le bouton Son
+    if (!el) return;
+    const g = MUSIQUE.volume * cible.v * (muet ? 0 : 1), cle = g.toFixed(3) + ' ' + Math.round(cible.hz / 50);
+    if (ctx) {
+      if (cle === envoye) return; envoye = cle;
+      gEspace.gain.setTargetAtTime(g, ctx.currentTime, 0.12); filtre.frequency.setTargetAtTime(cible.hz, ctx.currentTime, 0.12);
+    } else el.volume = clamp(g * niveau);
+  }
+  function vers(v, d) {                // le fondu
+    niveau = v;
+    if (ctx) { const t = ctx.currentTime; gFondu.gain.cancelScheduledValues(t); gFondu.gain.setValueAtTime(gFondu.gain.value, t); gFondu.gain.linearRampToValueAtTime(v, t + d); }
+    else regler();
+  }
+  function preparer(n) {               // un CD vient d'être choisi (on est dans le geste du joueur : c'est là que le son se débloque)
+    monter(); clearInterval(chute); try { el.playbackRate = 1; } catch (e) {}
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    pret = n;
+    const charger = () => { if (pret !== n) return; cd = 0;
+      if (absent[n]) { el.pause(); return; }
+      el.src = MUSIQUE.fichier(n); jouer(); };                  // il tourne en silence le temps que le disque arrive sur la platine
+    if (cd && !el.paused) { vers(0, 0.25); setTimeout(charger, 270); } else charger();   // le disque d'avant s'efface d'abord
+  }
+  function lancer() {                  // le disque est sur la platine : l'extrait repart du début et monte
+    if (!el || !pret || absent[pret]) return;
+    cd = pret; cible.v = 1; cible.hz = 20000;                    // on est devant la façade : plein son
+    try { el.currentTime = 0; } catch (e) {}
+    if (el.paused) jouer();
+    vers(1, MUSIQUE.fondu); regler();
+  }
+  function arreter(brutal) {           // brutal : la platine qui meurt (le juke-box explose), le disque ralentit et se tait
+    if (!el) return;
+    const tournait = cd; cd = 0; pret = 0;
+    if (!tournait) { el.pause(); return; }
+    if (brutal) {
+      try { el.preservesPitch = false; el.mozPreservesPitch = false; el.webkitPreservesPitch = false; } catch (e) {}
+      const t0 = performance.now(); vers(0, 0.55); clearInterval(chute);
+      chute = setInterval(() => { const u = (performance.now() - t0) / 600;      // 0,6 s pour tomber à l'arrêt
+        if (u >= 1) { clearInterval(chute); el.pause(); try { el.playbackRate = 1; } catch (e) {} }
+        else try { el.playbackRate = 1 - 0.7 * u; } catch (e) {} }, 40);
+    } else { vers(0, 0.4); setTimeout(() => { if (!cd && !pret) el.pause(); }, 450); }
+  }
+  document.addEventListener('visibilitychange', () => {       // l'onglet passe derrière : la musique se tait, et reprend au retour
+    if (!el) return;
+    if (document.visibilityState === 'hidden') { if (!el.paused) { retenue = true; el.pause(); } }
+    else if (retenue) { retenue = false; if (cd || pret) jouer(); }
+  });
+  return {
+    preparer, lancer, arreter,
+    ecoute(v, hz) { cible.v = v; cible.hz = hz; regler(); },   // v : 0 à 1 ; hz : fréquence au-dessus de laquelle le son s'étouffe
+    set muet(v) { muet = !!v; regler(); }, get muet() { return muet; },
+    get cd() { return cd; },
+    etat() { return { cd, pret, joue: !!el && !el.paused, temps: el ? el.currentTime : 0, fichier: el ? el.currentSrc.split('/').pop() : '', muet,
+      fondu: ctx ? gFondu.gain.value : niveau, volume: ctx ? gEspace.gain.value : (el ? el.volume : 0), coupure: ctx ? filtre.frequency.value : cible.hz,
+      vitesse: el ? el.playbackRate : 1, sansFichier: Object.keys(absent).map(Number) }; }
   };
 })();
 
@@ -3478,7 +3631,7 @@ function validate() {
 }
 function choose(n) {                 // un CD est choisi (clic dessus ou numéro validé)
   if (state !== 'browse') return;
-  sel = n; entry = pad(n); sfx.ok(); flipQ.length = 0;
+  sel = n; entry = pad(n); sfx.ok(); musique.preparer(n); flipQ.length = 0;
   setState('seek');
 }
 function seekTo(n) {                 // le juke-box feuillette tout seul jusqu'à la colonne du CD choisi
@@ -3523,6 +3676,7 @@ function setState(s) {
   $('jbLinks').hidden = !playing;
   if (playing) {
     const cd = CDS[sel - 1];
+    musique.lancer();
     $('hSpotify').href = cd.links.spotify; $('hDeezer').href = cd.links.deezer; $('hInstagram').href = cd.links.instagram;
     say('CD ' + pad(sel) + ', ' + cdName(cd) + ', en lecture. Liens : Spotify, Deezer, Instagram.');
     if (lastInput === 'key') $('hSpotify').focus({ preventScroll: true });
@@ -3541,8 +3695,8 @@ function updateHint() {
   else if (state === 'browse' || state === 'seek' || state === 'approach' || state === 'leave')   // même légende pendant l'arrivée : la mise en page ne bouge pas
     h = touch ? 'Glisse ou <b>◀ ▶</b> pour feuilleter · touche un CD, ou tape son numéro puis <b>↵</b>'
               : '<b>← →</b> ou <b>Q D</b> feuilleter · <b>chiffres + Entrée</b> ou clic sur un CD pour le lancer · <b>Échap</b> quitter';
-  else if (state === 'play') h = touch ? 'Choisis un lien · <b>Retour</b> pour reprendre le CD'
-              : '<b>↑ ↓</b> puis <b>Entrée</b> ouvrir un lien · <b>Échap</b> reprendre le CD';
+  else if (state === 'play') h = touch ? 'Choisis un lien · <b>Retour</b> aux disques, la musique continue'
+              : '<b>↑ ↓</b> puis <b>Entrée</b> ouvrir un lien · <b>Échap</b> retour aux disques, la musique continue';
   else if (state === 'load') h = 'Le juke-box va chercher le CD ' + pad(sel) + '…';
   $('jbHint').innerHTML = h || '&nbsp;';
 }
@@ -3884,7 +4038,7 @@ $('jbLeave').addEventListener('click', leave);
 [['jbPrev', -1], ['jbNext', +1]].forEach(([id, side]) => { const el = $(id);
   el.addEventListener('pointerdown', e => { lastInput = e.pointerType === 'touch' ? 'touch' : 'mouse'; });
   el.addEventListener('click', () => { if (state === 'browse') pressArrow(side); canvas.focus({ preventScroll: true }); updateHint(); }); });
-$('jbSnd').addEventListener('click', () => { sfx.on = !sfx.on; $('jbSnd').setAttribute('aria-pressed', sfx.on); if (sfx.on) sfx.key(); });
+$('jbSnd').addEventListener('click', () => { sfx.on = !sfx.on; musique.muet = !sfx.on; $('jbSnd').setAttribute('aria-pressed', sfx.on); if (sfx.on) sfx.key(); });
 
 /* ---------- mise à l'échelle : pixels entiers quand c'est possible ---------- */
 function fit() {
@@ -3921,6 +4075,7 @@ function paintFace() {
 //   face()  : repeint et renvoie l'image de la façade ; faceVersion change quand elle doit être relue
 window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, clack: () => sfx.clack(),
   get state() { return state; }, get column() { return col; }, get drawerOpen() { return drawerUnlocked; }, get faceVersion() { return faceVersion; },
+  musique,
   get selection() { return sel; }, get titre() { const cd = CDS[sel - 1]; return cd ? cdName(cd) : ''; } };   // le CD choisi (0 : aucun) et son nom
 })();
 </script>
