@@ -8,6 +8,7 @@
    avec « avis: 10 », un cartouche « Visite enregistrée » s'affiche dix secondes à l'arrivée, avec un bouton Refuser.
 
    Lien nominatif : berao.fr/?ami=marie  ->  la visite porte l'étiquette « marie » (visible aussi dans l'avertissement).
+   L'avertissement au visiteur est en anglais, comme le jeu ; le journal (ce qui arrive dans ta feuille) reste en français.
    Voir le journal en direct sur son propre écran : ajouter #trace à l'adresse.
    Ne pas s'enregistrer soi-même : ouvrir une fois berao.fr/#sans-trace sur chacun de ses appareils (navigateur par
    navigateur) ; berao.fr/#avec-trace remet l'enregistrement. Le réglage reste dans le navigateur, pas sur le site. */
@@ -132,7 +133,7 @@
     actif = false; refus = true; ecrire(localStorage, REFUS, '1');
     file = []; points = []; resume = []; tout = []; attente = [];
     try { sessionStorage.removeItem(CLE); } catch (e) {}
-    fermerAvis('Enregistrement arrêté.'); peindre();
+    fermerAvis('Recording stopped.'); peindre();
   }
   function bouton(texte, action) {
     var b = document.createElement('button'); b.type = 'button'; b.textContent = texte;
@@ -147,13 +148,13 @@
     avis = document.createElement('div'); avis.id = 'trAvis'; avis.setAttribute('role', 'status');
     var hote = document.getElementById('stage');
     if (hote) avis.className = 'hud'; else { hote = document.body; avis.className = 'trSeul'; avis.style.cssText = 'left:16px;bottom:16px;top:auto'; }
-    var texte = document.createElement('span'), pour = visite.ami ? ' (invité : ' + visite.ami + ')' : '';
+    var texte = document.createElement('span'), pour = visite.ami ? ' (guest: ' + visite.ami + ')' : '';
     if (R.accord) {
-      texte.innerHTML = '<i>●</i> Enregistrer cette visite ? Trajet et actions, sans nom' + pour + '.';
-      avis.appendChild(texte); avis.appendChild(bouton('OK', accepter)); avis.appendChild(bouton('Non', refuser));
+      texte.innerHTML = '<i>●</i> Record this visit? Path and actions, no name' + pour + '.';
+      avis.appendChild(texte); avis.appendChild(bouton('OK', accepter)); avis.appendChild(bouton('No', refuser));
     } else {
-      texte.innerHTML = '<i>●</i> Visite enregistrée : trajet et actions, sans nom' + pour + '.';
-      avis.appendChild(texte); avis.appendChild(bouton('Refuser', refuser));
+      texte.innerHTML = '<i>●</i> This visit is recorded: path and actions, no name' + pour + '.';
+      avis.appendChild(texte); avis.appendChild(bouton('Decline', refuser));
       minuterie = setTimeout(accepter, R.avis * 1000);
     }
     hote.appendChild(avis);
@@ -207,7 +208,11 @@
 
   /* ---------- Ce qu'on observe dans le bodega ---------- */
   var VOIT = { juke: 'le bouton du juke-box', tele: 'la télécommande', parler: 'quelqu\'un à qui parler', biere: 'le patron (commander une bière)',
-               boire: 'une bière à boire', archive: 'la porte des archives' };
+               boire: 'une bière à boire', archive: 'la porte des archives', toile: 'un tableau à regarder', tapis: 'le tapis de l\'entrée à regarder' };
+  function oeuvre() {                                            // la rubrique du journal : « tableau » ou « tapis »
+    var B = window.bodega;
+    try { return B.toile.genre && B.toile.genre() === 'tapis' ? 'tapis' : 'tableau'; } catch (e) { return 'tableau'; }
+  }
   function pages(n) { return n + (n > 1 ? ' pages feuilletées' : ' page feuilletée'); }
   function cd(J) { var n = J.selection; return n ? 'CD ' + (n < 10 ? '0' : '') + n + (J.titre ? ' (' + J.titre + ')' : '') : 'un CD'; }
   function regarder() {
@@ -219,6 +224,7 @@
       o = { ox: a[0], oz: a[1], K: (b[0] - a[0]) / 1000, x0: v.x, z0: v.z, parti: reprise, cand: '', depuis: 0, vus: {}, pt: 0, px: 1e9, py: 0, pa: 0,
             jb: J ? J.state : 'room', col: J ? J.column : 0, pages: 0, tiroir: J ? J.drawerOpen : false, ecoute: 0,
             tele: B.tele.etat(), assisA: 0, tv: null, volT: 0,
+            toile: B.toile ? B.toile.etat() : 'salle', toileA: 0,
             sert: false, boit: false, bieres: 0, bu: B.SKILL.bu, skill: B.SKILL.pipi, jet: false, jetT: 0,
             arrose: { patron: 0, danois: 0, juke: 0 }, mouille: false, vivant: B.JUKE.vivant, arch: false };
     }
@@ -282,6 +288,16 @@
       o.tv = tv;
     }
 
+    // Tableaux, tapis de l'entrée : on s'approche d'une œuvre pour la regarder, puis on revient
+    if (B.toile) {
+      var to = B.toile.etat();
+      if (to !== o.toile) {
+        if (to === 'vers') { o.toileA = maintenant; noter(oeuvre(), 'regarde de près ' + B.toile.nom() + ' (' + B.toile.artiste() + ')', 'regarde ' + B.toile.nom()); }
+        else if (to === 'retour') noter(oeuvre(), 'le quitte après ' + Math.round(maintenant - o.toileA) + ' s');
+        o.toile = to;
+      }
+    }
+
     // Le patron, la bière
     var sert = !!(B.barman && B.barman.sert());
     if (sert && !o.sert) noter('patron', 'pose une bière sur le comptoir');
@@ -342,6 +358,11 @@
     if (yt) yt.addEventListener('click', function () {
       var tv = null; try { tv = window.bodega.tele.TELE.etat(); } catch (e) {}
       noter('télé', 'ouvre le lien YouTube' + (tv ? ' de la chaîne ' + tv.chaine + (tv.nom ? ' (' + tv.nom + ')' : '') : ''), 'lien YouTube');
+    });
+    var ig = document.getElementById('toileInsta');            // le bouton Instagram sous un tableau ou sous le tapis
+    if (ig) ig.addEventListener('click', function () {
+      var a = ''; try { a = window.bodega.toile.artiste(); } catch (e) {}
+      noter(oeuvre(), 'ouvre l\'Instagram de l\'artiste' + (a ? ' (' + a + ')' : ''), 'Instagram ' + a);
     });
     [['hSpotify', 'Spotify'], ['hDeezer', 'Deezer'], ['hInstagram', 'Instagram']].forEach(function (l) {
       var el = document.getElementById(l[0]);
