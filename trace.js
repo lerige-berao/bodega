@@ -208,10 +208,11 @@
 
   /* ---------- Ce qu'on observe dans le bodega ---------- */
   var VOIT = { juke: 'le bouton du juke-box', tele: 'la télécommande', parler: 'quelqu\'un à qui parler', biere: 'le patron (commander une bière)',
-               boire: 'une bière à boire', archive: 'la porte des archives', toile: 'un tableau à regarder', tapis: 'le tapis de l\'entrée à regarder' };
-  function oeuvre() {                                            // la rubrique du journal : « tableau » ou « tapis »
-    var B = window.bodega;
-    try { return B.toile.genre && B.toile.genre() === 'tapis' ? 'tapis' : 'tableau'; } catch (e) { return 'tableau'; }
+               boire: 'une bière à boire', archive: 'la porte des archives', toile: 'un tableau à regarder', affiche: 'une affiche à regarder', tapis: 'le tapis de l\'entrée à regarder' };
+  function oeuvre() {                                            // la rubrique du journal : « tableau », « affiche » ou « tapis »
+    var g = '';
+    try { g = window.bodega.toile.genre ? window.bodega.toile.genre() : ''; } catch (e) {}
+    return g === 'tapis' ? 'tapis' : g === 'affiche' ? 'affiche' : 'tableau';
   }
   function pages(n) { return n + (n > 1 ? ' pages feuilletées' : ' page feuilletée'); }
   function cd(J) { var n = J.selection; return n ? 'CD ' + (n < 10 ? '0' : '') + n + (J.titre ? ' (' + J.titre + ')' : '') : 'un CD'; }
