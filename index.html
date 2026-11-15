@@ -1412,6 +1412,9 @@ body {
     deco([1005, 750], [1190, 750], 0.55, 0.3, 0.4, (BULK_Y + ROOM_H) / 2, lam(0, priceTex), false, OVER + 0.008);
   })();
 
+  // Où sont les tabourets (pixels du croquis, orientation), du juke-box vers le fond du bar. Le dessus du coussin est à 0,79 m.
+  // Sur le dernier, un client est perché (voir la section PNJ).
+  var TABOURETS = [[825, 582, Math.PI], [940, 715, 2.16], [1055, 780, Math.PI], [1120, 780, Math.PI]];
   // Tabourets de bar en bois : quatre pieds évasés, barreaux à deux hauteurs (ceux du bas ferrés de métal),
   // galette ronde rembourrée, en cuir sombre ou fauve
   (function () {
@@ -1430,7 +1433,7 @@ body {
       });
     });
     var seat = lathe([[0, H + 0.025], [0.15, H + 0.025], [0.172, H + 0.04], [0.176, H + 0.07], [0.165, H + 0.095], [0.12, H + 0.108], [0, H + 0.112]], 12);
-    var spots = [[825, 582, Math.PI], [940, 715, 2.16], [1055, 780, Math.PI], [1120, 780, Math.PI]].map(function (s, i) {
+    var spots = TABOURETS.map(function (s, i) {
       var c = P(s[0], s[1]);
       collide(c, c, 0.17, 0.79);
       return { x: c[0], y: 0, z: c[1], ry: s[2] + (rnd() - 0.5) * 0.5, c: i % 2 ? 0xb4692c : 0x30261f };
@@ -1870,10 +1873,10 @@ body {
   // Debout, le patron doit rester sous le dessous de la retombée du bar (1,94 m), même quand il parle et rebondit à chaque syllabe.
   // Assis, le client est plus petit : avec sa grosse tête, un gabarit de patron dépasserait de la chaise et irait cogner la suspension.
   // Déplacer un PNJ : barman.placer(P(x, y)) en pixels du croquis. Changer sa tenue : barman.habiller({ tshirt: 'autre.png' }).
-  var PNJ_TAILLE = 1.85, PNJ_ASSIS = 1.5, PNJ_LARGE = 1.08;
+  var PNJ_TAILLE = 1.85, PNJ_ASSIS = 1.5, PNJ_PERCHE = 1.6, PNJ_LARGE = 1.08;   // PNJ_PERCHE : le rat, sur son tabouret
   var TENUE = { tete: 'tete.png', tshirt: 'tshirt.png', pantalon: 'pantalon.png', chaussure: 'chaussure.png', semelle: 'semelle.png',
                 main: 'main.png', paume: 'paume.png', teteDos: 'tete-dos.png', tshirtDos: 'tshirt-dos.png', pantalonDos: 'pantalon-dos.png' };
-  var barman = null, assis = null;
+  var barman = null, assis = null, rat = null;
   var ASSIS_FACE = 0, ASSIS_LIM = 1.4, assisAngle = 0, assisDos = false;   // direction de la chaise, demi-tour permis de chaque côté (radians), angle courant, vu de dos ?
   // Le patron se tient derrière le pan oblique du comptoir, à 30 cm du bord du plateau, tourné vers la salle.
   // base : la direction du comptoir (perpendiculaire au pan oblique) ; il pivote vers le joueur de lim radians au plus de chaque côté,
@@ -1883,7 +1886,7 @@ body {
                  suite: [['verre', 14, 22], ['appuye', 7, 10], ['verre', 14, 22], ['hanche', 7, 10]], duree: 16 };
   function creerPnj(o) {
     var k;
-    for (k in TENUE) o[k] = TENUE[k];
+    for (k in TENUE) if (!(k in o)) o[k] = TENUE[k];                 // la tenue commune, sauf les calques qu'il apporte lui-même (le rat)
     o.taille = o.taille || PNJ_TAILLE; o.vie = !CALM;                // solides : le jet de pipi s'écrase sur eux
     o.mains = { ecart: 0.95 * PNJ_LARGE };                           // les mains suivent l'élargissement du corps
     if (o.sansMains) o.main = o.paume = null;                        // pas de mains du module : la page pose les siennes (les amoureux)
@@ -1910,6 +1913,20 @@ body {
     ASSIS_FACE = assisAngle = CHAIRS[2][2] + Math.PI;
     assis = creerPnj({ pos: P(CHAIRS[2][0], CHAIRS[2][1]), pose: 'assis', siege: 0.47, face: ASSIS_FACE, taille: PNJ_ASSIS, rayon: 0.18,
                        voix: { hauteur: 92, ivresse: 0.95 } });
+    // Le rat, au comptoir, sur le tabouret du fond (le dernier, côté mur est) : le deuxième PNJ de l'atelier, avec sa tête au long
+    // museau (le cou est sous le crâne, pas au milieu de l'image ; la tête enfoncée dans le col comme sous un bonnet), ses pattes
+    // (pas de paume : le dos de la patte sert des deux côtés), le t-shirt à l'envers et la ceinture.
+    // Il est perché : son jean est coupé en deux aux genoux, le haut relevé de 80 degrés vers le comptoir, le bas qui pend à la
+    // verticale. Une patte posée sur le comptoir, l'autre tient un verre de vin. Son regard va au comptoir (vers -z) : ses jambes
+    // et ses pattes y restent, pendant que son buste se tourne vers le joueur (face ou dos) comme les autres. Assis 3 cm en
+    // arrière du milieu du tabouret : ses genoux s'arrêtent juste sous le bord du plateau, à 27 cm devant lui.
+    // volteFace : il ne montre son dos (une découpe vide) que si on est franchement derrière lui. Du couloir on voit donc sa tête,
+    // le museau au-dessus du comptoir ; et de dos, le museau (50 cm de long) ne va jamais se planter dans le mur des fenêtres.
+    var tb = P(TABOURETS[3][0], TABOURETS[3][1]);
+    rat = creerPnj({ pos: [tb[0], tb[1] + 0.03], pose: 'tabouret', siege: 0.79, taille: PNJ_PERCHE, rayon: 0.12, regard: Math.PI,
+                     attitude: 'vin', comptoir: { hauteur: 1.06, distance: 0.27 }, voix: { hauteur: 114, ivresse: 0.6 },
+                     tete: 'tete2.png', teteDos: 'tete2-dos.png', cou: 0.57, enfonce: 0.17, tshirt: 'tshirt-dos.png', tshirtDos: 'tshirt.png',
+                     main: 'patte.png', paume: null, ceinture: 'ceinture.png', volteFace: -0.5 });
   }
   // Le client assis est un carton à deux faces planté sur sa chaise. De face, il tourne son recto vers le joueur ; quand le joueur
   // passe derrière lui, c'est son verso qu'il lui présente. Le changement de côté est immédiat, comme une carte qu'on retourne.
@@ -1950,11 +1967,11 @@ body {
   }
   function pnjVise() {
     var mieux = null, note = 0;
-    [barman, assis].forEach(function (n) {
+    [barman, assis, rat].forEach(function (n) {
       if (!n || n.parle() || n.sert()) return;                   // occupé : il finit sa phrase, ou son service
       var q = n.position(), dx = q[0] - pos.x, dz = q[1] - pos.z, d = Math.sqrt(dx * dx + dz * dz);
       if (d > n.options.portee || d < 0.01 || (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) / d < 0.5) return;
-      var v = viser(q[0], n.assis() ? n.options.siege - n.options.assis.descend + n.hauteur * 0.75 : n.hauteur * 0.72, q[1]);   // on vise le haut de son buste
+      var v = viser(q[0], n.assis() ? n.options.siege - n.options.assis.descend + n.hauteur * 0.75 : n.sommet() - n.hauteur * 0.28, q[1]);   // on vise le haut de son buste
       if (v > note) { note = v; mieux = n; }
     });
     return mieux ? [mieux, note] : null;
@@ -2059,14 +2076,14 @@ body {
   function arroser(c, x, y, z) {
     if (c && JUKE.vivant && JUKE.cols.indexOf(c) >= 0 && y < 1.9) { BOOM.touche = 0.25; BOOM.point = [x, y, z]; }   // sur le juke-box : voir « Le juke-box explose »
     if (!c || c.ax !== c.bx || c.az !== c.bz) return;            // un PNJ est un obstacle réduit à un point
-    [barman, assis].forEach(function (n) {
+    [barman, assis, rat].forEach(function (n) {
       if (!n) return;
-      var q = n.position(), haut = (n.assis() ? n.options.siege - n.options.assis.descend : 0) + n.hauteur + 0.1;
+      var q = n.position(), haut = n.sommet() + 0.1;
       if (Math.abs(c.ax - q[0]) < 1e-4 && Math.abs(c.az - q[1]) < 1e-4 && y <= haut) n.arrose = RALE;   // au-dessus de sa tête, le jet ne le mouille pas
     });
   }
   function raler(dt) {
-    [barman, assis].forEach(function (n) {
+    [barman, assis, rat].forEach(function (n) {
       if (!n || !(n.arrose > 0)) return;
       n.arrose -= dt;
       if (!n.parle()) n.parler();
@@ -3487,7 +3504,7 @@ body {
     requestAnimationFrame(frame);
   }
   // Petit accès pour les essais : placer la caméra
-  window.bodega = { ARCH: ARCH, entrerArchives: entrerArchives, presArchives: nearArchive, archivesIci: archivesIci, noterRetour: noterRetour, cam: function (x, z, y, p) { pos.x = x; pos.z = z; yaw = y; pitch = p || 0; }, P: P, colliders: colliders, radius: RADIUS, barman: barman, assis: assis, BARMAN: BARMAN, COUPLE: COUPLE, JUKE: JUKE, BOOM: BOOM, exploser: exploser, lueur: function () { return jukeLight.intensity; }, SKILL: SKILL, MISSION: MISSION, pipiLibre: function () { debloquerPipi(true); }, surCarreaux: surCarreaux, signaux: function () { return signaux; }, annonces: function () { return annonces; }, voix: function () { return voixCtx; }, BOIRE: BOIRE, biereVisee: biereVisee, mainBiere: mainBiere, pnjVise: pnjVise, utiliser: utiliser, use: function () { return useFor; }, pipi: pipi, tireuse: tireuse,
+  window.bodega = { ARCH: ARCH, entrerArchives: entrerArchives, presArchives: nearArchive, archivesIci: archivesIci, noterRetour: noterRetour, cam: function (x, z, y, p) { pos.x = x; pos.z = z; yaw = y; pitch = p || 0; }, P: P, colliders: colliders, radius: RADIUS, barman: barman, assis: assis, rat: rat, BARMAN: BARMAN, COUPLE: COUPLE, JUKE: JUKE, BOOM: BOOM, exploser: exploser, lueur: function () { return jukeLight.intensity; }, SKILL: SKILL, MISSION: MISSION, pipiLibre: function () { debloquerPipi(true); }, surCarreaux: surCarreaux, signaux: function () { return signaux; }, annonces: function () { return annonces; }, voix: function () { return voixCtx; }, BOIRE: BOIRE, biereVisee: biereVisee, mainBiere: mainBiere, pnjVise: pnjVise, utiliser: utiliser, use: function () { return useFor; }, pipi: pipi, tireuse: tireuse,
     // les tableaux : état ('salle', 'vers', 'devant', 'retour'), celui qu'on regarde, et de quoi les ouvrir pour les essais
     toile: { etat: function () { return TOILE.etat; }, nom: function () { return TOILE.qui ? TOILE.qui.nom : ''; }, artiste: function () { return TOILE.qui ? TOILE.qui.artiste : ''; },
              genre: function () { return TOILE.qui ? TOILE.qui.genre : ''; },

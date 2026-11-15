@@ -10,6 +10,18 @@
    Le dos : tete-dos.png, tshirt-dos.png, pantalon-dos.png, facultatifs. Avec eux le PNJ a un verso, comme une carte :
    le plan montre la face d'un côté et le dos de l'autre. Sans eux, le verso est la face en miroir.
      PNJ.creer({ ..., teteDos: 'tete-dos.png', tshirtDos: 'tshirt-dos.png', pantalonDos: 'pantalon-dos.png' });
+   Accessoires, facultatifs, à mettre ou à ôter comme un calque :
+     ceinture.png   une ceinture droite, boucle au milieu : posée sur le bas du t-shirt, là où commence le pantalon
+     bonnet.png     un bonnet vu de face : enfoncé sur le haut de la tête
+     casquette.png  une casquette vue de face : la visière sur le front
+     PNJ.creer({ ..., ceinture: 'ceinture.png', casquette: 'casquette.png' });
+     leo.habiller({ casquette: null, bonnet: 'bonnet.png' });                  // ôter l'une, mettre l'autre
+     PNJ.creer({ ..., bonnet: 'bonnet.png', accessoires: { bonnet: { largeur: 0.8, front: 0.5 } } });   // plus large, plus enfoncé
+   Une coiffe qui dépasse du crâne enfonce la tête dans le col. Pour l'avoir à cette hauteur même tête nue :
+     PNJ.creer({ ..., enfonce: 0.17 });                                        // 0.17 = la hauteur que donne le bonnet
+   De dos, le bonnet et la casquette gardent la même image (ou bonnetDos / casquetteDos si tu en fournis une) et la
+   ceinture devient une bande de cuir sans boucle (ou ceintureDos).
+
    Trois façons de le présenter au joueur :
      face: 'camera'                  il se tourne toujours vers le joueur, on ne voit que sa face (réglage par défaut)
      face: 'camera', regard: 0       il regarde dans une direction (angle en radians, 0 = vers +z) ; le plan reste tourné vers
@@ -22,6 +34,7 @@
      leo.attitude('appuye');   // les deux mains posées sur le comptoir, t-shirt penché vers l'avant, tête droite
      leo.attitude('hanche');   // une main sur le comptoir, l'autre sur la hanche, tête un peu penchée
      leo.attitude('verre');    // le barman : une main tient un verre, l'autre l'essuie avec un chiffon qui mousse
+     leo.attitude('vin');      // le client : une main posée sur le comptoir, l'autre tient un verre de vin par la jambe
      leo.attitude(null);       // il relâche tout
      leo.attitude('appuye', { hauteur: 1.06, distance: 0.3 });   // dessus du comptoir (1,06 m dans le bodega) et distance jusqu'à son bord
      leo.attitude('appuye', { direction: 1.57 });                // angle vers lequel il se tourne : là où est le comptoir
@@ -36,10 +49,19 @@
      PNJ.init({ ..., bouteille: function () { return MODELES.creer(THREE, 'bouteille'); } });
    Sans cela, une bouteille simple en trois cylindres la remplace.
 
-   Deux poses :
-     debout : tête, t-shirt, pantalon entier, chaussures de profil
-     assis  : tête, t-shirt, pantalon raccourci (on ne garde que le haut), semelles face au joueur ; le bas du PNJ est posé au bord du siège
-              (vu de dos : pas de semelles, les jambes partent de l'autre côté)
+   Trois poses :
+     debout   : tête, t-shirt, pantalon entier, chaussures de profil
+     assis    : tête, t-shirt, pantalon raccourci (on ne garde que le haut), semelles face au joueur ; le bas du PNJ est posé au bord du siège
+                (vu de dos : pas de semelles, les jambes partent de l'autre côté)
+     tabouret : assis sur un tabouret haut, le pantalon coupé en deux aux genoux. Le haut (les cuisses) part de l'ourlet du t-shirt
+                et se relève de 80 degrés vers là où il regarde (son regard : le comptoir) ; le bas (les jambes et les chaussures)
+                pend du genou, à la verticale comme debout. Le buste et la tête se tournent vers le joueur comme d'habitude (face
+                ou dos selon le côté) ; les jambes, elles, gardent leur direction. Chaque jambe du pantalon est une bande à part
+                (une cuisse, une jambe) : la cuisse roule sur son axe pour se montrer à plat, si bien que de profil on voit une
+                cuisse couchée vers le comptoir, une jambe qui pend du genou et un pied tourné vers le comptoir ; de face, le dessus
+                des deux cuisses. Les mains d'une attitude et le verre restent au comptoir, où qu'on soit.
+     PNJ.creer({ ..., pose: 'tabouret', siege: 0.79, regard: 3.14, attitude: 'vin' });   // sur un tabouret de bar, tourné vers le comptoir
+     leo.percher(0.79);                              // ou plus tard ; leo.lever() le remet debout
 
    Branchement dans le bodega (3 lignes) :
      PNJ.init({ THREE: THREE, scene: scene, camera: camera, colliders: colliders, dossier: 'pnj/' });
@@ -55,6 +77,7 @@
      leo.asseoir();  leo.asseoir(0.47);              // s'assoit là où il est (hauteur d'assise en mètres, 0.47 par défaut)
      leo.lever();                                    // se remet debout ; marcher() et ronde() le lèvent tout seuls
      PNJ.creer({ ..., pose: 'assis', siege: 0.47 }); // ou directement assis à la création
+     leo.sommet();                                   // hauteur du haut de sa tête, en mètres, quelle que soit sa pose
      leo.arreter();  leo.retirer();
 
    Lui parler : quand le joueur est à portée, il marmonne comme un Danois bourré (son fabriqué sur place, aucun fichier).
@@ -69,6 +92,10 @@
      PNJ.creer({ ..., main: 'main.png', paume: 'paume.png' });                // sans « main », pas de mains
      PNJ.creer({ ..., main: 'main.png', mains: { taille: 0.16, angle: 0.6 } });   // plus grosses, plus écartées ; sans paume, le dos sert des deux côtés
      leo.habiller({ main: 'gant.png', paume: 'gant-paume.png' });
+   Mains jointes : avec une image des deux mains serrées l'une contre l'autre, il les joint devant lui tant qu'on lui parle
+   (au lieu de les agiter), puis les relâche. Pas au comptoir : là, ses mains restent où l'attitude les a posées.
+     PNJ.creer({ ..., main: 'patte.png', mainsJointes: 'pattes-jointes.png' });
+     leo.joindre(true);  leo.joindre(false);                                  // les garder jointes hors parole, puis les relâcher
 
    Avec un vrai enregistrement : à chaque fois qu'on lui parle, il dit une phrase de l'audio, jamais deux fois la même de suite.
      PNJ.creer({ ..., voix: { fichier: 'voix.mp3' } });                       // phrases repérées toutes seules, aux silences
@@ -80,8 +107,10 @@ var PNJ = (function () {
   'use strict';
 
   var T3 = null, scene = null, camera = null, colliders = null, dossier = '';
-  var tous = [], images = {}, GEO = null, GEO_MAIN = null, fabriqueBouteille = null, horloge = 0, audio = null, bruit = null, banques = [];
-  var CALQUES = ['tete', 'tshirt', 'pantalon', 'chaussure', 'semelle', 'main', 'paume', 'teteDos', 'tshirtDos', 'pantalonDos'];
+  var tous = [], images = {}, GEO = null, GEO_G = null, GEO_D = null, GEO_MAIN = null, GEO_PLAT = null, fabriqueBouteille = null, horloge = 0, audio = null, bruit = null, banques = [];
+  var CALQUES = ['tete', 'tshirt', 'pantalon', 'chaussure', 'semelle', 'main', 'paume', 'mainsJointes', 'teteDos', 'tshirtDos', 'pantalonDos',
+                 'ceinture', 'bonnet', 'casquette', 'ceintureDos', 'bonnetDos', 'casquetteDos'];
+  var COIFFES = ['bonnet', 'casquette'];                              // dans l'ordre où on les enfile
   var FORME = { tete: 1, tshirt: 1.1, pantalon: 0.52, chaussure: 1.8, semelle: 0.4 }; // largeur / hauteur, si l'image manque
   var BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
@@ -92,6 +121,8 @@ var PNJ = (function () {
     teinte: 0xd8c6a4,      // voile de couleur, pour fondre le PNJ dans la lumière jaune du bar
     face: 'camera',        // 'camera' = se tourne toujours vers le joueur ; un angle en radians = carton fixe
     regard: null,          // avec face 'camera' : direction dans laquelle il regarde (radians) ; null = il montre toujours sa face
+    volteFace: 0,          // avec un regard : quand il montre son dos. C'est le cosinus de l'angle entre son regard et le joueur en dessous
+                           // duquel il se retourne : 0 = dès que le joueur passe derrière ses épaules ; -0.5 = seulement 30° plus loin
     solide: true,          // le joueur ne peut pas le traverser
     rayon: 0.18,           // encombrement au sol, en mètres
     vitesse: 0.8,          // marche, en m/s
@@ -100,6 +131,9 @@ var PNJ = (function () {
     proportions: { tete: 0.27, tshirt: 0.36, pantalon: 0.43, chaussure: 0.085 },
     recouvrement: { col: 0.03, ceinture: 0.04, cheville: 0.045 },
     ecart: 0.25,           // position de chaque pied, en part de la largeur du pantalon
+    cou: 0.5,              // où est le cou sous l'image de la tête, en part de sa largeur : 0.5 = au milieu ; à régler pour une tête
+                           // qui dépasse d'un côté (un long museau). De dos, l'image est supposée en miroir : le cou passe à 1 - cou.
+    enfonce: 0,            // de combien la tête descend dans le col, en hauteurs de tête : 0.17 = là où un bonnet la met
     portee: 1.6,           // distance, en mètres, en dessous de laquelle le joueur peut lui parler
     voix: {
       hauteur: 105,        // note de base, en Hz : 85 = très grave, 130 = voix claire
@@ -115,11 +149,23 @@ var PNJ = (function () {
       ecart: 0.95,         // où elles flottent : 1 = à l'aplomb du bord du t-shirt (manches comprises), plus = plus loin du corps
       hauteur: 0.75,       // poignet au-dessus du bas du t-shirt, en longueurs de main
       angle: 0.4,          // doigts tournés vers l'extérieur, en radians
-      flotte: true         // elles bougent toutes seules ; false = immobiles (sauf marche et parole)
+      flotte: true,        // elles bougent toutes seules ; false = immobiles (sauf marche et parole)
+      jointes: { taille: 0.85, hauteur: 0.42 }   // mains jointes : leur hauteur en longueurs de main, et où elles se tiennent sur le t-shirt (0 = ourlet, 1 = col)
     },
-    attitude: null,        // null, 'appuye', 'hanche' ou 'verre' (voir l'en-tête)
+    accessoires: {
+      ceinture: { largeur: 1 },                            // largeur, en largeurs de pantalon ; sa hauteur suit l'image
+      // largeur en largeurs de tête, hauteur en hauteurs de tête ; front : jusqu'où le bord descend sur la tête (0 = sommet, 1 = menton)
+      bonnet: { largeur: 0.7, hauteur: 0.62, front: 0.45 },
+      casquette: { largeur: 0.78, hauteur: 0.6, front: 0.5 }
+    },
+    attitude: null,        // null, 'appuye', 'hanche', 'verre' ou 'vin' (voir l'en-tête)
     comptoir: { hauteur: 1.06, distance: 0.3 },   // dessus du comptoir, et distance entre lui et le bord du comptoir, en mètres ; direction : facultatif
-    pose: 'debout',        // 'debout' ou 'assis'
+    pose: 'debout',        // 'debout', 'assis' ou 'tabouret'
+    tabouret: {            // la pose « tabouret » : le pantalon plié en deux, comme un carton
+      coupe: 0.5,          // où il se plie, en part de sa hauteur depuis la ceinture : 0.5 = coupé en deux, aux genoux
+      angle: 80,           // de combien le haut se relève vers l'avant, en degrés : 0 = debout, 90 = cuisses à l'horizontale
+      monte: 0.05          // le pli des hanches est d'autant au-dessus de l'assise (mètres) : les cuisses passent sur le coussin
+    },
     siege: 0.47,           // pose assise : hauteur de l'assise, en mètres (bancs et chaises du bodega : 0.47)
     assis: {
       coupe: 0.22,         // part du pantalon qu'on garde, en partant de la ceinture : 0.22 = juste le bassin
@@ -228,9 +274,15 @@ var PNJ = (function () {
   function composer(calques, o, vue) {
     o = fusion(DEFAUT, o || {});
     var dos = vue === 'dos';
-    if (dos) calques = { tete: calques.teteDos || calques.tete, tshirt: calques.tshirtDos || calques.tshirt,
-                         pantalon: calques.pantalonDos || calques.pantalon, chaussure: calques.chaussure, semelle: calques.semelle };
-    var p = o.proportions, r = o.recouvrement, A = o.assis, assis = o.pose === 'assis';
+    var unie = false;                                                   // de dos sans image de dos : la ceinture se réduit à sa bande de cuir
+    if (dos) {
+      unie = !calques.ceintureDos && !!calques.ceinture;
+      calques = { tete: calques.teteDos || calques.tete, tshirt: calques.tshirtDos || calques.tshirt,
+                  pantalon: calques.pantalonDos || calques.pantalon, chaussure: calques.chaussure, semelle: calques.semelle,
+                  ceinture: calques.ceintureDos || calques.ceinture, bonnet: calques.bonnetDos || calques.bonnet,
+                  casquette: calques.casquetteDos || calques.casquette };
+    }
+    var p = o.proportions, r = o.recouvrement, A = o.assis, assis = o.pose === 'assis', perche = o.pose === 'tabouret';
     var parts = p.tete + p.tshirt + p.pantalon + p.chaussure - r.col - r.ceinture - r.cheville;
     var px = o.taille / parts * o.grain;                                // pixels pour une part de 1 : la même échelle debout et assis
     var H = {}, L = {}, Y = {};
@@ -240,7 +292,24 @@ var PNJ = (function () {
     }
     mesurer('tete', p.tete); mesurer('tshirt', p.tshirt); mesurer('pantalon', p.pantalon);
     mesurer('chaussure', p.chaussure); mesurer('semelle', A.semelle);
-    Y.tete = 0;
+    // Accessoires : la boîte de chaque coiffe par rapport à la tête, et la ceinture par rapport au pantalon
+    var AC = o.accessoires, coiffes = [], monte = 0, lCoiffe = 0, ceint = null;
+    COIFFES.forEach(function (nom) {
+      if (!calques[nom]) return;
+      var q = { c: calques[nom], l: Math.max(2, Math.round(AC[nom].largeur * L.tete)), h: Math.max(2, Math.round(AC[nom].hauteur * H.tete)) };
+      q.y = Math.round(AC[nom].front * H.tete) - q.h;                     // son bord haut, compté depuis le sommet de la tête (négatif : elle dépasse)
+      monte = Math.max(monte, -q.y); lCoiffe = Math.max(lCoiffe, q.l);
+      coiffes.push(q);
+    });
+    if (calques.ceinture) {
+      ceint = { c: calques.ceinture, l: Math.max(2, Math.round(AC.ceinture.largeur * L.pantalon)) };
+      ceint.h = Math.max(2, Math.round(ceint.l * calques.ceinture.h / calques.ceinture.w));
+    }
+    // Une coiffe qui dépasse pousse la tête d'autant dans le col. enfonce la met déjà à cette hauteur, coiffe ou pas :
+    // la tête ne bouge alors plus quand on le coiffe, tant que la coiffe ne dépasse pas davantage.
+    Y.tete = Math.max(monte, Math.round(Math.max(0, o.enfonce) * H.tete));
+    var cou = Math.max(0, Math.min(1, dos ? 1 - o.cou : o.cou));
+    var decale = Math.round((0.5 - cou) * L.tete), lTete = L.tete + 2 * Math.abs(decale);   // la tête est décalée pour que le cou tombe sur l'axe du corps
     Y.tshirt = H.tete - Math.round(r.col * px);
     Y.pantalon = Y.tshirt + H.tshirt - Math.round(r.ceinture * px);
     var pied, W, bas, marge = 0, court = Math.max(2, Math.round(H.pantalon * A.coupe));
@@ -249,12 +318,12 @@ var PNJ = (function () {
       marge = Math.ceil(Math.abs(Math.sin(A.angle)) * H.semelle / 2) + 1; // place prise par l'inclinaison
       bas = Y.pantalon + court + Math.round(A.depasse * px);
       Y.semelle = bas - H.semelle;
-      W = Math.max(L.tete, L.tshirt, L.pantalon, 2 * (pied + marge) + L.semelle) + 2;
+      W = Math.max(lTete, lCoiffe, L.tshirt, L.pantalon, 2 * (pied + marge) + L.semelle) + 2;
       bas += marge;
     } else {
       Y.chaussure = Y.pantalon + H.pantalon - Math.round(r.cheville * px);
       pied = Math.round(L.pantalon * o.ecart + L.chaussure * 0.16);      // du milieu du corps au milieu d'une chaussure
-      W = Math.max(L.tete, L.tshirt, L.pantalon, 2 * pied + L.chaussure) + 2;
+      W = Math.max(lTete, lCoiffe, L.tshirt, L.pantalon, 2 * pied + L.chaussure) + 2;
       bas = Y.chaussure + H.chaussure;
     }
     W += W % 2;
@@ -291,8 +360,19 @@ var PNJ = (function () {
         poser(g, 'chaussure', cx + pied);
       }
     }
-    function peindreTorse(g) { poser(g, 'tshirt', cx); }
-    function peindreTete(g) { poser(g, 'tete', cx); }
+    // Étire une image dans une boîte. part : fraction de sa largeur qu'on prend, depuis la gauche.
+    function etirer(g, q, x, y, l, h, part) {
+      var s = reduire(q.c, l);
+      g.drawImage(s, 0, 0, Math.max(1, s.width * (part || 1)), s.height, Math.round(x), Math.round(y), l, h);
+    }
+    function peindreTorse(g) {
+      poser(g, 'tshirt', cx);
+      if (ceint) etirer(g, ceint.c, cx - ceint.l / 2, ourletY - ceint.h, ceint.l, ceint.h, unie ? 0.16 : 1);   // sur le bas du t-shirt, pile là où passe la taille du pantalon
+    }
+    function peindreTete(g) {
+      poser(g, 'tete', cx + decale);
+      coiffes.forEach(function (q) { etirer(g, q.c, cx - q.l / 2, Y.tete + q.y, q.l, q.h); });
+    }
     // Un morceau sur sa propre toile. y = hauteur de son bord bas au-dessus des pieds, en mètres.
     function morceau(largeur, y0, y1, peindre) {
       var w = largeur + 2; w += w % 2;
@@ -306,9 +386,14 @@ var PNJ = (function () {
     var hautBas = assis ? Math.min(ourletY, Y.semelle - marge) : Y.pantalon;
     var parties = {
       bas: morceau(assis ? Math.max(L.pantalon, 2 * (pied + marge) + L.semelle) : Math.max(L.pantalon, 2 * pied + L.chaussure), hautBas, bas, peindreBas),
-      torse: morceau(L.tshirt, Y.tshirt, ourletY, peindreTorse),
-      tete: morceau(L.tete, 0, H.tete, peindreTete)
+      torse: morceau(Math.max(L.tshirt, ceint ? ceint.l : 0), Y.tshirt, ourletY, peindreTorse),
+      tete: morceau(Math.max(lTete, lCoiffe), 0, Y.tete + H.tete, peindreTete)
     };
+    if (perche) {                                                       // sur un tabouret : le pantalon coupé en deux, là où il se plie
+      var pli = Math.min(bas - 2, Math.max(ourletY + 2, Y.pantalon + Math.round(H.pantalon * o.tabouret.coupe)));
+      parties.cuisses = morceau(L.pantalon, ourletY, pli, function (g) { poser(g, 'pantalon', cx); });   // de l'ourlet du t-shirt aux genoux
+      parties.bas = morceau(Math.max(L.pantalon, 2 * pied + L.chaussure), pli, bas, peindreBas);          // des genoux aux chaussures
+    }
     // La silhouette entière sur une seule toile, pour un aperçu 2D : du fond vers le devant.
     var c = toile(W, bas), g = c.getContext('2d');
     g.imageSmoothingEnabled = true;
@@ -324,8 +409,8 @@ var PNJ = (function () {
   // (sans calque de dos : la face en miroir), alignés par le bas, là où le morceau pivote.
   function composerCorps(calques, o) {
     var f = composer(calques, o, 'face'), d = null, P = {}, grain = f.c.width / f.l;
-    if (calques.teteDos || calques.tshirtDos || calques.pantalonDos) d = composer(calques, o, 'dos');
-    ['bas', 'torse', 'tete'].forEach(function (nom) {
+    if (calques.teteDos || calques.tshirtDos || calques.pantalonDos || calques.ceinture || calques.ceintureDos || calques.bonnetDos || calques.casquetteDos) d = composer(calques, o, 'dos');
+    Object.keys(f.parties).forEach(function (nom) {
       var a = f.parties[nom], b = d ? d.parties[nom].c : null;
       var l = Math.max(a.c.width, b ? b.width : 0), h = Math.max(a.c.height, b ? b.height : 0);
       var c = toile(l * 2, h), g = c.getContext('2d');
@@ -628,6 +713,24 @@ var PNJ = (function () {
     return { groupe: g, verre: verre, chiffon: chiffon, bulles: bulles };
   }
 
+  // Un verre à vin en volume, façon PS1 : le pied, la jambe, un calice à sept pans et le vin rouge au fond. Origine sous le pied.
+  function verreDeVin(parent) {
+    var g = new T3.Group();
+    var verre = new T3.MeshLambertMaterial({ color: 0xcfe9e2, transparent: true, opacity: 0.5, side: T3.DoubleSide });
+    var vin = new T3.MeshLambertMaterial({ color: 0x7a1020 });
+    function tronc(haut, bas, h, y, mat, ouvert) {
+      var m = new T3.Mesh(new T3.CylinderGeometry(haut, bas, h, 7, 1, !!ouvert), mat);
+      m.position.y = y + h / 2; g.add(m);
+    }
+    tronc(0.008, 0.034, 0.008, 0, verre);              // le pied
+    tronc(0.006, 0.006, 0.07, 0.008, verre);           // la jambe
+    tronc(0.039, 0.011, 0.04, 0.081, vin);             // le vin
+    tronc(0.043, 0.01, 0.05, 0.078, verre, true);      // le bas du calice, qui s'évase
+    tronc(0.034, 0.043, 0.05, 0.128, verre, true);     // le haut, qui se resserre
+    parent.add(g);
+    return g;
+  }
+
   // La bouteille qu'il sert : celle fournie par la page, sinon trois cylindres bruns et une étiquette.
   function bouteille() {
     var b = null;
@@ -661,12 +764,22 @@ var PNJ = (function () {
   function creer(opt) {
     if (!T3) throw new Error('PNJ.init({ THREE, scene, camera }) doit être appelé avant PNJ.creer');
     var o = fusion(DEFAUT, opt || {});
-    var vet = { tete: o.tete, tshirt: o.tshirt, pantalon: o.pantalon, chaussure: o.chaussure, semelle: o.semelle, main: o.main, paume: o.paume,
-                teteDos: o.teteDos, tshirtDos: o.tshirtDos, pantalonDos: o.pantalonDos };
+    var vet = { tete: o.tete, tshirt: o.tshirt, pantalon: o.pantalon, chaussure: o.chaussure, semelle: o.semelle, main: o.main, paume: o.paume, mainsJointes: o.mainsJointes,
+                teteDos: o.teteDos, tshirtDos: o.tshirtDos, pantalonDos: o.pantalonDos,
+                ceinture: o.ceinture, bonnet: o.bonnet, casquette: o.casquette, ceintureDos: o.ceintureDos, bonnetDos: o.bonnetDos, casquetteDos: o.casquetteDos };
     var groupe = new T3.Group(), corps = new T3.Group(), morceaux = {}, repos = null;
-    ['bas', 'torse', 'tete'].forEach(function (nom) {                  // recto verso par la géométrie ; apparaissent dès que les images sont là
+    ['bas', 'torse', 'tete', 'cuisses'].forEach(function (nom) {       // recto verso par la géométrie ; apparaissent dès que les images sont là
       var m = new T3.Mesh(GEO, new T3.MeshBasicMaterial({ map: texture(toile(2, 2)), alphaTest: 0.5, side: T3.FrontSide, color: o.teinte }));
-      m.visible = false; corps.add(m); morceaux[nom] = m;
+      m.visible = false; if (nom !== 'cuisses') corps.add(m); morceaux[nom] = m;   // « cuisses » ne sert qu'à porter la toile du haut du pantalon
+    });
+    // Sur un tabouret, le bas du corps est fait de quatre bandes, deux par jambe du pantalon : une cuisse accrochée au pli de la
+    // hanche, une jambe qui pend du genou. Chacune montre une moitié des toiles « cuisses » et « bas », dont elle partage la matière.
+    var jambes = [-1, 1].map(function (c) {                            // -1 : sa jambe droite (à gauche quand on lui fait face) ; 1 : sa gauche
+      var hanche = new T3.Group(), geo = c < 0 ? GEO_G : GEO_D;
+      hanche.rotation.order = 'YXZ';                                    // d'abord vers où il regarde (y), puis le relèvement (x)
+      var cuisse = new T3.Mesh(geo, morceaux.cuisses.material), bas = new T3.Mesh(geo, morceaux.bas.material);
+      cuisse.visible = bas.visible = false; hanche.add(cuisse); corps.add(hanche); corps.add(bas);
+      return { cote: c, hanche: hanche, cuisse: cuisse, bas: bas };
     });
     groupe.add(corps); scene.add(groupe);
     // Deux mains à deux faces : une seule matière, la main de droite est le miroir de celle de gauche.
@@ -678,10 +791,14 @@ var PNJ = (function () {
       return { plan: m, cote: cote, phase: cote * 1.3 + tous.length * 0.9 };
     });
     var attache = null;                                                 // où flottent les mains au repos (mètres), ou null s'il n'en a pas
+    // Les mains jointes : une seule image à plat, devant le ventre, qui remplace les deux mains quand il les joint.
+    var joint = new T3.Mesh(GEO_PLAT, new T3.MeshBasicMaterial({ map: texture(toile(2, 2)), alphaTest: 0.5, side: T3.DoubleSide, color: o.teinte }));
+    joint.visible = false; groupe.add(joint);
+    var jointes = null;                                                 // leur taille (mètres), ou null s'il n'a pas cette image
     var depart = point(o.pos !== undefined ? o.pos : o.x || 0, o.z || 0);
     var col = (o.solide && colliders) ? { ax: 0, az: 0, bx: 0, bz: 0, pad: o.rayon } : null;
     if (col) colliders.push(col);
-    var etat = { cible: null, file: null, rang: 0, pause: 0, attente: 0, pas: 0, graine: tous.length * 1.7, tirage: 0, fin: null, socle: 0, geste: 0, sens: 1, cote: 1, att: 0, attNom: o.attitude || null, verrou: 0, props: null, service: null, servies: [], nbServies: 0, regard: (typeof o.regard === 'number') ? o.regard : null, voix: null, replique: 0, numero: tous.length, banque: null, sac: [], derniere: -1 };
+    var etat = { cible: null, file: null, rang: 0, pause: 0, attente: 0, pas: 0, graine: tous.length * 1.7, tirage: 0, fin: null, socle: 0, geste: 0, joint: 0, forceJoint: false, sens: 1, cote: 1, att: 0, attNom: o.attitude || null, verrou: 0, props: null, service: null, servies: [], nbServies: 0, regard: (typeof o.regard === 'number') ? o.regard : null, voix: null, replique: 0, numero: tous.length, banque: null, sac: [], derniere: -1 };
 
     function poserEn(x, z) {
       groupe.position.set(x, 0, z);
@@ -694,13 +811,22 @@ var PNJ = (function () {
           calques[nom] = q;
           if (--reste || tirage !== etat.tirage) return;
           var r = composerCorps(calques, o);
-          ['bas', 'torse', 'tete'].forEach(function (nom) {
+          ['bas', 'torse', 'tete', 'cuisses'].forEach(function (nom) {
             var m = morceaux[nom], q = r.parties[nom], ancienne = m.material.map;
+            if (!q) { m.visible = false; return; }                     // pas de cuisses à part, debout ou assis sur une chaise
             m.material.map = texture(q.c); ancienne.dispose();
             m.scale.set(q.l, q.h, 1); m.visible = true;
           });
-          repos = { bas: r.parties.bas.y, torse: r.parties.torse.y, cou: r.parties.tete.y - r.parties.torse.y, ourlet: r.ourlet, demi: r.demiTshirt };
-          etat.socle = o.pose === 'assis' ? o.siege - o.assis.descend : 0;   // assis : le bas du corps est posé au bord de l'assise
+          var pc = r.parties.cuisses, pb = r.parties.bas;               // perché : les quatre bandes remplacent le bas d'une seule pièce
+          morceaux.bas.visible = !pc;
+          jambes.forEach(function (j) {
+            j.cuisse.visible = j.bas.visible = !!pc;
+            if (pc) { j.cuisse.scale.set(pc.l / 2, pc.h, 1); j.bas.scale.set(pb.l / 2, pb.h, 1); }
+          });
+          repos = { bas: pb.y, torse: r.parties.torse.y, cou: r.parties.tete.y - r.parties.torse.y, ourlet: r.ourlet, demi: r.demiTshirt, hTorse: r.parties.torse.h,
+                    cuisse: pc ? pc.h : 0, jean: pc ? pc.l : 0, jambe: pb.h, pieds: pb.l };
+          // assis : le bas du corps est posé au bord de l'assise ; sur un tabouret : l'ourlet du t-shirt (le pli des hanches) est juste au-dessus
+          etat.socle = o.pose === 'assis' ? o.siege - o.assis.descend : o.pose === 'tabouret' ? o.siege + o.tabouret.monte - r.ourlet : 0;
           corps.position.y = etat.socle;
           pnj.largeur = r.l; pnj.hauteur = r.h; pnj.toile = r.c;
           if (calques.main) {                                           // les mains : même grain, même finition que le corps
@@ -709,6 +835,14 @@ var PNJ = (function () {
             attache = { l: rm.l, h: rm.h, x: r.demiTshirt * M.ecart + rm.l * 0.2, y: r.ourlet + rm.h * M.hauteur };
             pnj.toileMains = rm.c;
           } else { attache = null; pnj.toileMains = null; }
+          if (calques.mainsJointes && attache) {
+            var qj = calques.mainsJointes, hj = Math.max(4, Math.round(o.mains.jointes.taille * attache.h * o.grain)), lj = Math.max(2, Math.round(hj * qj.w / qj.h));
+            var cj = toile(lj, hj), gj0 = cj.getContext('2d'), vieuxJ = joint.material.map;
+            gj0.imageSmoothingEnabled = true; gj0.drawImage(reduire(qj.c, lj), 0, 0, lj, hj);
+            finir(cj, o.couleurs);
+            joint.material.map = texture(cj); vieuxJ.dispose();
+            jointes = { l: lj / o.grain, h: hj / o.grain };
+          } else { jointes = null; joint.visible = false; }
           mains.forEach(function (m) { m.plan.visible = !!attache; if (attache) m.plan.scale.set(-m.cote * attache.l, attache.h, 1); });   // à gauche l'image telle quelle, à droite son miroir
           if (pnj.pret) pnj.pret(pnj);
         });
@@ -721,14 +855,14 @@ var PNJ = (function () {
       if (f) banque(f, ph, function (b) { if (o.voix.fichier === f && o.voix.phrases === ph && !b.erreur) etat.banque = b; if (pnj.voixPrete) pnj.voixPrete(pnj, b); });
     }
     var pnj = {
-      groupe: groupe, corps: corps, morceaux: morceaux, options: o, tenue: vet, largeur: 0, hauteur: 0, toile: null, pret: o.pret || null, voixPrete: o.voixPrete || null,
+      groupe: groupe, corps: corps, morceaux: morceaux, jambes: jambes, options: o, tenue: vet, largeur: 0, hauteur: 0, toile: null, pret: o.pret || null, voixPrete: o.voixPrete || null,
       // Change un ou plusieurs calques : { tshirt: 'rouge.png' }. Accepte un nom de fichier, une URL, un <img> ou un <canvas>.
       habiller: function (v) { for (var k in v) if (k in vet) vet[k] = v[k]; tisser(); return pnj; },
       // Modifie des réglages (taille, proportions, grain, teinte, face...) et refait la texture.
       regler: function (v) {
         o = pnj.options = fusion(o, v);
         for (var nm in morceaux) morceaux[nm].material.color.set(o.teinte);
-        matMain.color.set(o.teinte);
+        matMain.color.set(o.teinte); joint.material.color.set(o.teinte);
         if (col) col.pad = o.rayon;
         if (v.voix && ('fichier' in v.voix || 'phrases' in v.voix)) accorder();
         if ('regard' in v) etat.regard = (typeof o.regard === 'number') ? o.regard : null;
@@ -737,11 +871,11 @@ var PNJ = (function () {
       },
       placer: function (x, z) { var q = point(x, z); etat.cible = etat.file = null; poserEn(q[0], q[1]); return pnj; },
       marcher: function (x, z, fin) {
-        var q = point(x, z); if (o.pose === 'assis') pnj.lever();
+        var q = point(x, z); if (o.pose !== 'debout') pnj.lever();
         etat.file = null; etat.cible = q; etat.fin = typeof z === 'function' ? z : fin || null; return pnj;
       },
       ronde: function (points, pause) {
-        if (o.pose === 'assis') pnj.lever();
+        if (o.pose !== 'debout') pnj.lever();
         etat.file = points.map(function (q) { return point(q); }); etat.rang = 0; etat.pause = pause || 0; etat.attente = 0;
         etat.cible = etat.file[0]; etat.fin = null; return pnj;
       },
@@ -780,6 +914,9 @@ var PNJ = (function () {
         return pnj;
       },
       sert: function () { return !!etat.service; },
+      // Garde les mains jointes (true) ou les relâche (false), en dehors de la parole. Sans image de mains jointes, sans effet.
+      joindre: function (oui) { etat.forceJoint = !!oui; return pnj; },
+      mainsJointes: function () { return joint.visible; },
       bouteilles: function () { return etat.servies.map(function (q) { return q.objet; }); },
       // Prend une attitude au comptoir : 'appuye', 'hanche', 'verre', ou null pour tout relâcher. comptoir = { hauteur, distance }, facultatif.
       attitude: function (nom, comptoir) {
@@ -801,8 +938,16 @@ var PNJ = (function () {
         if (siege !== undefined) o.siege = siege;
         tisser(); return pnj;
       },
+      // Se perche sur un tabouret haut, là où il est : le pantalon plié aux genoux. siege = hauteur du dessus du tabouret.
+      percher: function (siege) {
+        etat.cible = etat.file = null; o.pose = 'tabouret';
+        if (siege !== undefined) o.siege = siege;
+        tisser(); return pnj;
+      },
       lever: function () { o.pose = 'debout'; tisser(); return pnj; },
       assis: function () { return o.pose === 'assis'; },
+      perche: function () { return o.pose === 'tabouret'; },
+      sommet: function () { return etat.socle + pnj.hauteur; },         // le haut de sa tête, en mètres au-dessus du sol
       // Il marmonne une phrase (jamais deux fois la même). À appeler depuis un clic, un toucher ou une touche.
       parler: function () {
         var ctx = contexte();
@@ -841,7 +986,7 @@ var PNJ = (function () {
       position: function () { return [groupe.position.x, groupe.position.z]; },
       enMarche: function () { return !!etat.cible; },
       retirer: function () {
-        scene.remove(groupe); matMain.map.dispose(); matMain.dispose();
+        scene.remove(groupe); matMain.map.dispose(); matMain.dispose(); joint.material.map.dispose(); joint.material.dispose();
         etat.servies.forEach(function (q) { scene.remove(q.objet); });
         for (var nm in morceaux) { morceaux[nm].material.map.dispose(); morceaux[nm].material.dispose(); }
         var i = tous.indexOf(pnj); if (i >= 0) tous.splice(i, 1);
@@ -879,12 +1024,13 @@ var PNJ = (function () {
         var w = etat.att * etat.att * (3 - 2 * etat.att);
         // Orientation. sens = 1 : il montre sa face au joueur ; -1 : le corps est retourné, le joueur voit le dos.
         var vers = camera ? Math.atan2(camera.position.x - gp.x, camera.position.z - gp.z) : 0;
-        if (enPose) { groupe.rotation.y = typeof etat.regard === 'number' ? etat.regard : etat.verrou; etat.sens = 1; }
+        var perche = o.pose === 'tabouret';                             // perché : le buste se tourne vers le joueur même en attitude, les cuisses et les mains restent au comptoir
+        if (enPose && !perche) { groupe.rotation.y = typeof etat.regard === 'number' ? etat.regard : etat.verrou; etat.sens = 1; }
         else if (o.face === 'camera') {
           if (etat.regard === null) etat.sens = 1;
           else {
             var devant = Math.cos(vers - etat.regard);                  // > 0 : le joueur est devant lui
-            if (devant > 0.06) etat.sens = 1; else if (devant < -0.06) etat.sens = -1;   // petite marge : pas de clignotement pile de profil
+            if (devant > o.volteFace + 0.06) etat.sens = 1; else if (devant < o.volteFace - 0.06) etat.sens = -1;   // petite marge : pas de clignotement pile à la limite
           }
           groupe.rotation.y = etat.sens > 0 ? vers : vers + Math.PI;
         } else { groupe.rotation.y = o.face; etat.sens = 1; }
@@ -909,6 +1055,11 @@ var PNJ = (function () {
         if (nomA === 'appuye') penche = 0.34;
         else if (nomA === 'hanche') { penche = 0.1; incline = 0.2; }
         else if (nomA === 'verre') { penche = 0.1; incline = 0.07 + 0.03 * Math.sin(T * 1.9); }
+        else if (nomA === 'vin') { penche = 0.06; incline = 0.06 + 0.02 * Math.sin(T * 0.7); }
+        if (perche) penche = 0;                                         // perché, le buste reste droit : il fait face au joueur, pas au comptoir
+        // Perché : de combien son regard (le comptoir) est tourné par rapport au plan du buste, qui fait face au joueur
+        var ecartR = perche && typeof etat.regard === 'number' ? Math.atan2(Math.sin(etat.regard - groupe.rotation.y), Math.cos(etat.regard - groupe.rotation.y)) : 0;
+        var cR = Math.cos(ecartR), sR = Math.sin(ecartR);
         penche *= w; incline *= w;
         // Service : ws = 0 à 1, poids du geste ; B = où est le cul de la bouteille à cet instant.
         var S = etat.service, ws = 0, B = null;
@@ -920,7 +1071,31 @@ var PNJ = (function () {
         }
         if (repos) {
           var fin = 0.004 * cote;                                       // un cheveu d'écart, pour que chaque morceau passe devant le précédent
-          morceaux.bas.position.set(0, repos.bas, assis ? fin : -fin);
+          if (perche && repos.cuisse) {
+            // Les cuisses partent du pli des hanches (l'ourlet du t-shirt) et se relèvent de « angle » vers son regard ; chacune
+            // roule sur son axe pour montrer son plat au joueur. Les jambes pendent des genoux, à la verticale, face au joueur.
+            var pli = o.tabouret.angle * Math.PI / 180, cp = Math.cos(pli), sp = Math.sin(pli), Lc = repos.cuisse, quart = repos.jean / 4;
+            var vx = 0, vy = 0.7, vz = cote;                            // où est le joueur, vu des hanches (repère du buste)
+            if (camera) {
+              var ex = camera.position.x - gp.x, ez = camera.position.z - gp.z, cg = Math.cos(groupe.rotation.y), sg = Math.sin(groupe.rotation.y);
+              vx = ex * cg - ez * sg; vz = ex * sg + ez * cg; vy = camera.position.y - (corps.position.y + repos.ourlet);
+            }
+            var ax = vx * cR - vz * sR, az = vx * sR + vz * cR;         // ... puis dans le repère des cuisses
+            var roule = Math.atan2(ax, vy * sp + az * cp) + (cote < 0 ? Math.PI : 0);   // vu de dos : le dos du pantalon
+            // De profil, les deux pieds pointent vers le comptoir (les deux bandes montrent la même moitié de la toile) ; de face
+            // ou de dos, chacun vers l'extérieur comme debout. Une marge, pour ne pas hésiter entre les deux.
+            var tr = Math.abs(sR); if (tr > 0.55) etat.profil = true; else if (tr < 0.45) etat.profil = false;
+            // Vue de profil, une jambe recule d'une demi-largeur : son bord avant reste à l'aplomb du genou, pas dans le comptoir
+            var av = Lc * sp - quart * tr, dehors = repos.pieds / 4 - quart;   // dehors : de combien la chaussure déporte le milieu de la bande
+            jambes.forEach(function (j) {
+              var c = j.cote, hx = c * quart * cR, hz = -c * quart * sR * 0.5;   // sa hanche : à côté de l'autre (deux fois moins en profondeur : elles se chevauchent à peine)
+              j.hanche.position.set(hx, repos.ourlet, hz); j.hanche.rotation.set(-pli, ecartR, 0);
+              j.cuisse.position.set(0, -Lc, 0); j.cuisse.rotation.y = roule;
+              var pied = etat.profil ? (sR > 0 ? 1 : -1) : c;           // de quel côté pointe sa chaussure
+              j.bas.geometry = pied > 0 ? GEO_D : GEO_G;
+              j.bas.position.set(hx + sR * av + pied * dehors, repos.ourlet - Lc * cp - repos.jambe, hz + cR * av - 1.5 * fin);
+            });
+          } else morceaux.bas.position.set(0, repos.bas, assis ? fin : -fin);
           morceaux.torse.position.set(0, repos.torse, 0);
           morceaux.torse.rotation.x = penche;
           morceaux.tete.position.set(0, repos.torse + repos.cou * Math.cos(penche), repos.cou * Math.sin(penche) + 2 * fin);
@@ -930,10 +1105,28 @@ var PNJ = (function () {
         // Le verre du barman : au niveau du ventre, un peu devant lui. Le chiffon et la mousse suivent la main qui frotte.
         var H0 = o.comptoir.hauteur + 0.006, D0 = o.comptoir.distance, frotte = T * 7;
         var V = repos ? { x: 0.05, y: Math.max(etat.socle + repos.ourlet + 0.24, o.comptoir.hauteur + 0.15), z: corps.position.z + 0.2 } : null;   // au-dessus du comptoir, pour qu'on le voie côté client
+        // Le verre de vin du client : tenu par la jambe dans sa main droite, levé au-dessus du comptoir (on le voit par-dessus la main
+        // posée, de quelque côté qu'on arrive). Perché, le comptoir est là où va son regard, pas forcément devant le buste : ce qui
+        // est « au comptoir » (le verre, les mains posées) est tourné d'autant.
+        function auComptoir(q) { var x = q[0], z = q[2]; q[0] = x * cR + z * sR; q[2] = -x * sR + z * cR; return q; }
+        var VV = repos ? auComptoir([-0.13, H0 + 0.12 + 0.006 * Math.sin(T * 1.3 + etat.graine), D0 + 0.17]) : null;
+        if (VV && Math.abs(VV[0]) > 0.04) etat.vinCote = VV[0] > 0 ? 1 : -1;   // de quel côté du buste est le verre : la main vient de l'autre
         if (attache) {                                                  // les mains : elles flottent, balancent à la marche, s'agitent quand il parle, se posent en attitude
           var M = o.mains, saut = corps.position.y;
           etat.geste += ((etat.voix ? 1 : 0) - etat.geste) * Math.min(1, dt * 5);
           var ge = etat.geste * (1 - w), tourne = ge * ge * (3 - 2 * ge);
+          // Mains jointes : tant qu'on lui parle (ou sur demande), les deux mains vont l'une vers l'autre puis l'image jointe les remplace.
+          etat.joint += ((jointes && (etat.voix || etat.forceJoint) ? 1 : 0) - etat.joint) * Math.min(1, dt * 6);
+          var gj = etat.joint * (1 - w) * (1 - ws), serre = gj > 0.6, kj = Math.min(1, gj / 0.6); kj = kj * kj * (3 - 2 * kj);
+          var yJ = repos ? saut + repos.ourlet + repos.hTorse * M.jointes.hauteur : saut;
+          if (jointes) { ge = 0; tourne = 0; }                           // celui qui joint les mains ne les agite pas
+          joint.visible = !!jointes && serre;
+          if (joint.visible) {
+            var gros = 0.8 + 0.2 * Math.min(1, (gj - 0.6) / 0.25);
+            joint.scale.set(jointes.l * gros, jointes.h * gros, 1);
+            joint.position.set(0, yJ + 0.015 * ouvre, corps.position.z + 0.06);   // devant son ventre : de dos, le corps les cache
+            joint.rotation.z = etat.voix ? 0.06 * Math.sin(T * 5.2) : 0;
+          }
           mains.forEach(function (m) {
             var c = m.cote, q = m.plan, f = M.flotte ? 1 : 0;
             // au repos : de chaque côté du t-shirt
@@ -942,6 +1135,10 @@ var PNJ = (function () {
             y += ge * (0.1 + 0.05 * Math.sin(T * 6.3 + m.phase) + 0.05 * ouvre);   // il parle : les mains montent et battent la mesure
             x += ge * 0.05; rz += ge * (0.35 + 0.3 * Math.sin(T * 4.1 + m.phase));
             var px = c * x, py = saut + y, pz = corps.position.z + cote * 0.03, rX = 0, rY = c * tourne * Math.PI, rZ = c * rz;
+            if (kj > 0) {                                               // elles se rapprochent, doigts tournés l'une vers l'autre
+              px += (c * 0.07 - px) * kj; py += (yJ + attache.h * 0.5 - py) * kj; rZ += (-c * 0.45 - rZ) * kj;
+            }
+            q.visible = !serre;
             // en attitude : la cible de cette main, dans le repère du PNJ (x à droite, y en haut, z devant lui)
             var leve = 0.7, yPose = H0 + attache.h * Math.sin(leve);   // posée sur le comptoir du bout des doigts, poignet relevé : on la voit côté client
             var a = null, aPlat = [c * 0.25, yPose, D0 + 0.04, -Math.PI / 2 + leve, c * 0.3, 0];   // doigts vers l'avant, un peu ouverts
@@ -950,6 +1147,13 @@ var PNJ = (function () {
                                                  : [repos.demi * 0.75, Math.max(etat.socle + repos.ourlet + attache.h * 0.75, H0 + 0.17), corps.position.z + cote * 0.1, 0, 0, -0.9];   // sur la hanche, doigts vers l'intérieur ; jamais sous le comptoir, sinon on ne la voit pas
             else if (nomA === 'verre' && V) a = c > 0 ? [V.x + 0.17, V.y - 0.03, V.z - 0.025, 0, Math.PI, -Math.PI / 2 + 0.12]                       // paume ouverte derrière le verre : elle le tient
                                                      : [V.x - 0.2 + 0.028 * Math.cos(frotte), V.y + 0.1 + 0.022 * Math.sin(frotte), V.z + 0.05, 0, 0, 1.1 + 0.12 * Math.sin(frotte)];   // l'autre frotte en rond
+            else if (nomA === 'vin' && VV) {
+              var vc = etat.vinCote || 1;
+              // elle tient la jambe du verre : à plat devant le joueur, paume vers lui, juste derrière le verre, les doigts passés sous le calice
+              if (c < 0) a = [VV[0] - vc * attache.h * 0.62, VV[1] + 0.045, VV[2] - 0.02 * cote, 0, cote > 0 ? Math.PI : 0, vc * (Math.PI / 2 - 0.1)];
+              else { a = auComptoir([0.12, H0 + attache.h * Math.sin(0.3), D0 + 0.06, -Math.PI / 2 + 0.3, 0.25, 0]); a[4] += ecartR; }   // l'autre est posée à plat sur le comptoir
+            }
+            if (a && perche && nomA === 'appuye') { a = auComptoir(a.slice()); a[4] += ecartR; }   // perché et appuyé : les deux mains restent sur le comptoir
             if (a && w > 0.001) {
               px += (a[0] - px) * w; py += (a[1] - py) * w; pz += (a[2] - pz) * w;
               rX += (a[3] - rX) * w; rY += (a[4] - rY) * w; rZ += (a[5] - rZ) * w;
@@ -982,6 +1186,13 @@ var PNJ = (function () {
             }
           }
           if (S.t >= S.duree) etat.service = null;
+        }
+        // Le verre de vin : en volume lui aussi. Il n'existe que pour un PNJ qui en a tenu un.
+        var montrerVin = nomA === 'vin' && w > 0.02 && VV;
+        if (montrerVin && !etat.vin) etat.vin = verreDeVin(groupe);
+        if (etat.vin) {
+          etat.vin.visible = !!montrerVin;
+          if (montrerVin) { etat.vin.scale.set(w, w, w); etat.vin.position.set(VV[0], VV[1], VV[2]); etat.vin.rotation.z = 0.05 * Math.sin(T * 0.9 + etat.graine); }
         }
         // Verre, chiffon et mousse : en volume, façon PS1. Ils n'existent que pour un PNJ qui a déjà essuyé un verre.
         var wv = w * (1 - ws), montrer = nomA === 'verre' && wv > 0.02 && V;   // pendant un service, il a posé son verre
@@ -1022,7 +1233,17 @@ var PNJ = (function () {
       GEO.setAttribute('position', new T3.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0, -0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0], 3));
       GEO.setAttribute('uv', new T3.Float32BufferAttribute([0, 0, 0.5, 0, 0.5, 1, 0, 1, 1, 0, 0.5, 0, 0.5, 1, 1, 1], 2));
       GEO.setIndex([0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6]);
+      // Une moitié de morceau, recentrée sur elle-même : la moitié gauche (GEO_G) ou droite (GEO_D) de la face, et la même jambe au dos.
+      function moitie(u0, u1) {
+        var g = new T3.BufferGeometry();
+        g.setAttribute('position', new T3.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0, -0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0], 3));
+        g.setAttribute('uv', new T3.Float32BufferAttribute([u0, 0, u1, 0, u1, 1, u0, 1, 1 - u0, 0, 1 - u1, 0, 1 - u1, 1, 1 - u0, 1], 2));
+        g.setIndex([0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6]);
+        return g;
+      }
+      GEO_G = moitie(0, 0.25); GEO_D = moitie(0.25, 0.5);
       // Une main : deux carrés dos à dos, origine au poignet. Devant, la moitié gauche de la toile (le dos) ; derrière, la moitié droite (la paume).
+      GEO_PLAT = new T3.PlaneGeometry(1, 1);                            // une image à plat, vue des deux côtés : les mains jointes
       GEO_MAIN = new T3.BufferGeometry();
       GEO_MAIN.setAttribute('position', new T3.Float32BufferAttribute([-0.5, -1, 0, 0.5, -1, 0, 0.5, 0, 0, -0.5, 0, 0, -0.5, -1, 0, 0.5, -1, 0, 0.5, 0, 0, -0.5, 0, 0], 3));
       GEO_MAIN.setAttribute('uv', new T3.Float32BufferAttribute([0, 0, 0.5, 0, 0.5, 1, 0, 1, 1, 0, 0.5, 0, 0.5, 1, 1, 1], 2));
