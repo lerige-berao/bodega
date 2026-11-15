@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bodega de Copenhague</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600&family=VT323&display=swap" rel="stylesheet">
 <style>
 /* Base commune (celle que Claude ajoutait autour de la page) */
@@ -394,10 +396,10 @@ body {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="pnj.js"></script>
-<script src="pipi.js"></script>
-<script src="modeles.js"></script>
-<script src="signal.js"></script>
+<script src="pnj.js?v=bca84d9b"></script>
+<script src="pipi.js?v=e6d0b8b6"></script>
+<script src="modeles.js?v=73fc1a7e"></script>
+<script src="signal.js?v=40755415"></script>
 <script>
 (function () {
   'use strict';
@@ -1040,7 +1042,7 @@ body {
   // met son milieu à la hauteur où était celui du cadre et laisse 24 cm sous le plafond. Elle avance de 41 cm au plus (le bec),
   // au-dessus du bout de la table : personne ne peut s'y cogner.
   (function () {
-    if (!window.MODELES) return;
+    if (!window.MODELES || !window.MODELES.noms || window.MODELES.noms().indexOf('armure') < 0) return;   // pas d'armure dans ce modeles.js (vieille copie en cache) : rien au mur, rien à regarder
     var A = anchor(NORTH_SALLE[0], NORTH_SALLE[1], 0.4, false, 0.05), armure = window.MODELES.creer(THREE, 'armure', { teinte: [0.92, 0.86, 0.72] });   // ses blancs, réchauffés comme la lumière de la salle
     armure.position.set(A.x, 0.84, A.z);
     armure.rotation.y = A.rot;
@@ -1712,7 +1714,10 @@ body {
     if (tele.etat !== 'salle' || TOILE.etat !== 'salle') return;
     if (e.pointerType === 'mouse') {
       if (document.pointerLockElement === canvas) look(e.movementX || 0, e.movementY || 0, 0.0024);
-      else if (mouseDown) { look(e.clientX - last.x, e.clientY - last.y, 0.005); last.x = e.clientX; last.y = e.clientY; }
+      else if (mouseDown) {
+        if (e.buttons === 0) { mouseDown = false; return; }       // bouton relâché hors de la salle : on ne tourne plus
+        look(e.clientX - last.x, e.clientY - last.y, 0.005); last.x = e.clientX; last.y = e.clientY;
+      }
       return;
     }
     if (e.pointerId === moveId) {
@@ -3279,16 +3284,29 @@ body {
   var MS = 14; // px par mètre ; monde x -0.5..8.5, z -2.5..5
   function mx(x) { return (x + 0.5) * MS + 3; }
   function mz(z) { return (z + 2.5) * MS + 7; }
+  // Les obstacles ne bougent presque jamais : ils sont tracés une fois sur une toile à part (mapFond), refaite seulement quand leur
+  // liste change (le juke-box saute, un PNJ est déplacé). Et tant que le joueur ne bouge ni ne tourne, le mini-plan reste tel quel.
+  var mapFond = document.createElement('canvas'), mapFondG = mapFond.getContext('2d'), mapSigne = null, mapVu = null;
   function drawMap() {
-    mg.clearRect(0, 0, map.width, map.height);
-    mg.lineCap = 'round';
-    for (var i = 0; i < colliders.length; i++) {
-      var c = colliders[i];
-      mg.strokeStyle = 'rgba(239,230,210,0.75)';
-      mg.lineWidth = Math.max(1, c.pad * 2 * MS);
-      mg.beginPath(); mg.moveTo(mx(c.ax), mz(c.az)); mg.lineTo(mx(c.bx), mz(c.bz) + 0.01); mg.stroke();
+    var i, c, signe = colliders.length;
+    for (i = 0; i < colliders.length; i++) { c = colliders[i]; signe += c.ax * 1.7 + c.az * 3.1 + c.bx * 5.3 + c.bz * 7.7 + c.pad * 11.3; }
+    if (signe !== mapSigne || mapFond.width !== map.width || mapFond.height !== map.height) {
+      mapSigne = signe; mapVu = null;
+      mapFond.width = map.width; mapFond.height = map.height;      // changer la taille efface aussi la toile
+      mapFondG.lineCap = 'round';
+      for (i = 0; i < colliders.length; i++) {
+        c = colliders[i];
+        mapFondG.strokeStyle = 'rgba(239,230,210,0.75)';
+        mapFondG.lineWidth = Math.max(1, c.pad * 2 * MS);
+        mapFondG.beginPath(); mapFondG.moveTo(mx(c.ax), mz(c.az)); mapFondG.lineTo(mx(c.bx), mz(c.bz) + 0.01); mapFondG.stroke();
+      }
     }
-    var px = mx(pos.x), pz = mz(pos.z);
+    var px = mx(pos.x), pz = mz(pos.z), vu = px.toFixed(2) + ' ' + pz.toFixed(2) + ' ' + yaw.toFixed(3);
+    if (vu === mapVu) return;
+    mapVu = vu;
+    mg.clearRect(0, 0, map.width, map.height);
+    mg.drawImage(mapFond, 0, 0);
+    mg.lineCap = 'round';
     mg.strokeStyle = '#e0a83a'; mg.lineWidth = 1.5;
     mg.beginPath(); mg.moveTo(px, pz); mg.lineTo(px - Math.sin(yaw) * 9, pz - Math.cos(yaw) * 9); mg.stroke();
     mg.fillStyle = '#e0a83a';
@@ -4350,6 +4368,6 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
   get selection() { return sel; }, get titre() { const cd = CDS[sel - 1]; return cd ? cdName(cd) : ''; } };   // le CD choisi (0 : aucun) et son nom
 })();
 </script>
-<script src="trace.js"></script>   <!-- le journal de visite : voir trace.js -->
+<script src="trace.js?v=1d7beb25"></script>   <!-- le journal de visite : voir trace.js -->
 </body>
 </html>

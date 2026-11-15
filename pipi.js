@@ -372,6 +372,7 @@ var PIPI = (function () {
       });
     }
 
+    var auRepos = false;                                           // tout est vide, et ce vide a déjà été dessiné
     var api = {
       groupe: groupe, reglages: R,
       ouvrir: function () { if (!ouvert) { ouvert = true; duree = 0; regard = 0.5; } aFermer = false; return api; },
@@ -390,8 +391,17 @@ var PIPI = (function () {
       },
       maj: function (dt, joueur) {
         simuler(dt, joueur);
+        // Rien ne coule, rien ne vole, rien par terre, et tout a déjà été effacé à l'image d'avant : on ne redessine pas.
+        // (Sans cela, 440 gouttes vides, le filet et les flaques étaient renvoyés à la carte graphique à chaque image.)
+        var i, vivant = ouvert || pression > 0;
+        for (i = 0; !vivant && i < NJ; i++) vivant = etat[i] !== 0;
+        for (i = 0; !vivant && i < NE; i++) vivant = el[i] > 0;
+        for (i = 0; !vivant && i < NF; i++) vivant = fr[i] > 0;
+        if (!vivant && auRepos) return;
+        auRepos = !vivant;
         dessinerGouttes(); dessinerFilet(); dessinerFlaques();
-      }
+      },
+      repos: function () { return auRepos; }                      // pour les essais : vrai quand le module ne dessine plus rien
     };
     return api;
   }

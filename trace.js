@@ -28,10 +28,12 @@
 
   /* ---------- La visite ---------- */
   var CLE = 'bodega-trace', REFUS = 'bodega-trace-refus';
+  function magasin(nom) { try { return window[nom]; } catch (e) { return null; } }   // stockage bloqué par le navigateur : on s'en passe, sans erreur
+  var LOCAL = magasin('localStorage'), SESSION = magasin('sessionStorage');
   function lire(st, k) { try { return st.getItem(k); } catch (e) { return null; } }
   function ecrire(st, k, v) { try { st.setItem(k, v); } catch (e) {} }
   var visite = null;
-  try { visite = JSON.parse(lire(sessionStorage, CLE) || 'null'); } catch (e) { visite = null; }
+  try { visite = JSON.parse(lire(SESSION, CLE) || 'null'); } catch (e) { visite = null; }
   if (visite && !(/^v[a-z0-9]{7}$/.test(String(visite.s)) && Date.now() - visite.t0 < 3 * 3600 * 1000 && Date.now() >= visite.t0)) visite = null;   // trop vieille ou abîmée
   var reprise = !!visite;                                     // on revient dans la même visite (retour des archives, page rechargée)
   if (reprise) { visite.ami = String(visite.ami || '').replace(/[^a-z0-9_-]/g, '').slice(0, 24); visite.n = +visite.n || 0; visite.b = +visite.b || 0; visite.ok = visite.ok === true; }
@@ -42,11 +44,11 @@
     for (var i = 0; i < 7; i++) id += 'abcdefghijklmnopqrstuvwxyz0123456789'.charAt(Math.floor(Math.random() * 36));
     visite = { s: id, n: 0, b: 0, t0: Date.now(), ami: ami, ok: false };
   }
-  function garder() { ecrire(sessionStorage, CLE, JSON.stringify(visite)); }
+  function garder() { ecrire(SESSION, CLE, JSON.stringify(visite)); }
   // #sans-trace : cet appareil ne s'enregistre plus (le propriétaire du site, par exemple) ; #avec-trace : il s'enregistre de nouveau
-  if (/sans-trace/.test(location.hash)) { ecrire(localStorage, REFUS, '1'); try { sessionStorage.removeItem(CLE); } catch (e) {} }
-  else if (/avec-trace/.test(location.hash)) { try { localStorage.removeItem(REFUS); } catch (e) {} }
-  var refus = lire(localStorage, REFUS) === '1';
+  if (/sans-trace/.test(location.hash)) { ecrire(LOCAL, REFUS, '1'); try { SESSION.removeItem(CLE); } catch (e) {} }
+  else if (/avec-trace/.test(location.hash)) { try { LOCAL.removeItem(REFUS); } catch (e) {} }
+  var refus = lire(LOCAL, REFUS) === '1';
   var tactile = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   var bar = !!document.getElementById('stage');               // la page du bodega ; sinon, celle des archives
   var actif = !refus, fautes = 0;
@@ -130,9 +132,9 @@
   }
   function accepter() { visite.ok = true; garder(); fermerAvis(''); envoyer(false); }
   function refuser() {
-    actif = false; refus = true; ecrire(localStorage, REFUS, '1');
+    actif = false; refus = true; ecrire(LOCAL, REFUS, '1');
     file = []; points = []; resume = []; tout = []; attente = [];
-    try { sessionStorage.removeItem(CLE); } catch (e) {}
+    try { SESSION.removeItem(CLE); } catch (e) {}
     fermerAvis('Recording stopped.'); peindre();
   }
   function bouton(texte, action) {
