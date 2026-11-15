@@ -208,11 +208,12 @@
 
   /* ---------- Ce qu'on observe dans le bodega ---------- */
   var VOIT = { juke: 'le bouton du juke-box', tele: 'la télécommande', parler: 'quelqu\'un à qui parler', biere: 'le patron (commander une bière)',
-               boire: 'une bière à boire', archive: 'la porte des archives', toile: 'un tableau à regarder', affiche: 'une affiche à regarder', tapis: 'le tapis de l\'entrée à regarder' };
-  function oeuvre() {                                            // la rubrique du journal : « tableau », « affiche » ou « tapis »
+               boire: 'une bière à boire', archive: 'la porte des archives', toile: 'un tableau à regarder', affiche: 'une affiche à regarder', tapis: 'le tapis de l\'entrée à regarder',
+               armure: 'une armure à regarder' };
+  function oeuvre() {                                            // la rubrique du journal : « tableau », « affiche », « tapis » ou « armure »
     var g = '';
     try { g = window.bodega.toile.genre ? window.bodega.toile.genre() : ''; } catch (e) {}
-    return g === 'tapis' ? 'tapis' : g === 'affiche' ? 'affiche' : 'tableau';
+    return g === 'tapis' ? 'tapis' : g === 'affiche' ? 'affiche' : g === 'armure' ? 'armure' : 'tableau';
   }
   function pages(n) { return n + (n > 1 ? ' pages feuilletées' : ' page feuilletée'); }
   function cd(J) { var n = J.selection; return n ? 'CD ' + (n < 10 ? '0' : '') + n + (J.titre ? ' (' + J.titre + ')' : '') : 'un CD'; }
@@ -227,7 +228,7 @@
             tele: B.tele.etat(), assisA: 0, tv: null, volT: 0,
             toile: B.toile ? B.toile.etat() : 'salle', toileA: 0,
             sert: false, boit: false, bieres: 0, bu: B.SKILL.bu, skill: B.SKILL.pipi, jet: false, jetT: 0,
-            arrose: { patron: 0, danois: 0, rat: 0, juke: 0 }, mouille: false, vivant: B.JUKE.vivant, arch: false };
+            arrose: { patron: 0, danois: 0, juke: 0 }, mouille: false, vivant: B.JUKE.vivant, arch: false };
     }
     ici[0] = (v.x - o.ox) / o.K; ici[1] = (v.z - o.oz) / o.K;
 
@@ -320,7 +321,6 @@
     }
     cible('patron', B.barman && B.barman.arrose > 0, 'arrose le patron');
     cible('danois', B.assis && B.assis.arrose > 0, 'arrose le Danois');
-    cible('rat', B.rat && B.rat.arrose > 0, 'arrose le rat');
     cible('juke', B.JUKE.vivant && B.BOOM.touche > 0, 'arrose le juke-box');
     var mouille = !!(B.pipi && B.pipi.mouille() > 0.05);
     if (mouille && !o.mouille) noter('pipi', 'se fait pipi dessus', 'se fait pipi dessus');
@@ -341,9 +341,8 @@
       if ((window.Jukebox && window.Jukebox.state !== 'room') || B.tele.etat() !== 'salle') return;   // le juke-box ou la télé ont la main
       k = B.use(); if (k !== 'parler' && k !== 'biere') return;
       v = B.pnjVise(); if (!v) return;
-      var patron = v[0] === B.barman, rat = !!B.rat && v[0] === B.rat;   // le rat : le client du dernier tabouret, avec son verre de vin
-      noter(patron ? 'patron' : rat ? 'rat' : 'Danois', k === 'biere' ? 'commande une bière' : 'lui parle',
-            k === 'biere' ? 'commande une bière' : patron ? 'parle au patron' : rat ? 'parle au rat' : 'parle au Danois');
+      var patron = v[0] === B.barman;
+      noter(patron ? 'patron' : 'Danois', k === 'biere' ? 'commande une bière' : 'lui parle', k === 'biere' ? 'commande une bière' : patron ? 'parle au patron' : 'parle au Danois');
     } catch (e) {}
   }
 
