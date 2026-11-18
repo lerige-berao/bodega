@@ -211,11 +211,11 @@
   /* ---------- Ce qu'on observe dans le bodega ---------- */
   var VOIT = { juke: 'le bouton du juke-box', tele: 'la télécommande', parler: 'quelqu\'un à qui parler', biere: 'le patron (commander une bière)',
                boire: 'une bière à boire', archive: 'la porte des archives', toile: 'un tableau à regarder', affiche: 'une affiche à regarder', tapis: 'le tapis de l\'entrée à regarder',
-               armure: 'une armure à regarder' };
-  function oeuvre() {                                            // la rubrique du journal : « tableau », « affiche », « tapis » ou « armure »
+               masque: 'un masque à regarder', photo: 'une photo à regarder', asseoir: 'un siège où s\'asseoir' };
+  function oeuvre() {                                            // la rubrique du journal : « tableau », « affiche », « tapis », « masque » ou « photo »
     var g = '';
     try { g = window.bodega.toile.genre ? window.bodega.toile.genre() : ''; } catch (e) {}
-    return g === 'tapis' ? 'tapis' : g === 'affiche' ? 'affiche' : g === 'armure' ? 'armure' : 'tableau';
+    return g === 'tapis' ? 'tapis' : g === 'affiche' ? 'affiche' : g === 'masque' ? 'masque' : g === 'photo' ? 'photo' : 'tableau';
   }
   function pages(n) { return n + (n > 1 ? ' pages feuilletées' : ' page feuilletée'); }
   function cd(J) { var n = J.selection; return n ? 'CD ' + (n < 10 ? '0' : '') + n + (J.titre ? ' (' + J.titre + ')' : '') : 'un CD'; }
@@ -229,6 +229,7 @@
             jb: J ? J.state : 'room', col: J ? J.column : 0, pages: 0, tiroir: J ? J.drawerOpen : false, ecoute: 0,
             tele: B.tele.etat(), assisA: 0, tv: null, volT: 0,
             toile: B.toile ? B.toile.etat() : 'salle', toileA: 0,
+            siege: B.siege ? B.siege.etat() : 'debout', siegeA: 0,
             sert: false, boit: false, bieres: 0, bu: B.SKILL.bu, skill: B.SKILL.pipi, jet: false, jetT: 0,
             arrose: { patron: 0, danois: 0, juke: 0 }, mouille: false, vivant: B.JUKE.vivant, arch: false };
     }
@@ -254,7 +255,7 @@
 
     // Ce que le bouton propose : la première fois seulement (« il a vu la télécommande »)
     k = B.use();
-    if (k && !o.vus[k]) { o.vus[k] = true; noter('voit', VOIT[k] || k); }
+    if (k && k !== 'lever' && !o.vus[k]) { o.vus[k] = true; noter('voit', VOIT[k] || k); }
 
     // Juke-box
     if (J) {
@@ -299,6 +300,16 @@
         if (to === 'vers') { o.toileA = maintenant; noter(oeuvre(), 'regarde de près ' + B.toile.nom() + ' (' + B.toile.artiste() + ')', 'regarde ' + B.toile.nom()); }
         else if (to === 'retour') noter(oeuvre(), 'le quitte après ' + Math.round(maintenant - o.toileA) + ' s');
         o.toile = to;
+      }
+    }
+
+    // Les sièges : on s'assoit, on se relève
+    if (B.siege) {
+      var si = B.siege.etat();
+      if (si !== o.siege) {
+        if (si === 'vers') { o.siegeA = maintenant; noter('siège', 's\'assoit sur ' + (B.siege.nom() || 'un siège'), 's\'assoit'); }
+        else if (si === 'retour') noter('siège', 'se relève après ' + Math.round(maintenant - o.siegeA) + ' s', 'se relève');
+        o.siege = si;
       }
     }
 
