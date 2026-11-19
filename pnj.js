@@ -35,6 +35,8 @@
                                      le joueur mais montre la face ou le dos selon que le joueur est devant ou derrière lui.
                                      Quand il marche, il regarde où il va : on le voit de dos quand il s'éloigne.
      face: 1.57                      carton fixe : un vrai recto verso planté dans le décor
+     face: 'regard', regard: 0       il montre où il regarde : le carton se tourne vers son regard (face d'un côté, dos de l'autre),
+                                     en douceur, sans jamais se présenter par la tranche (réglage biais)
      leo.regarder(0);  leo.regarder(P(700, 800));    // change la direction du regard : un angle, ou un point à regarder
 
    Attitudes au comptoir : il se tourne vers le comptoir (son regard) et prend la pose, sur place.
@@ -126,7 +128,9 @@ var PNJ = (function () {
     grain: 150,            // pixels de texture par mètre : plus bas = plus PS1, plus haut = plus net
     couleurs: 32,          // niveaux par canal (32 = les 15 bits de la PS1) ; 0 = couleurs intactes
     teinte: 0xd8c6a4,      // voile de couleur, pour fondre le PNJ dans la lumière jaune du bar
-    face: 'camera',        // 'camera' = se tourne toujours vers le joueur ; un angle en radians = carton fixe
+    face: 'camera',        // 'camera' = se tourne toujours vers le joueur ; un angle en radians = carton fixe ; 'regard' = tourné vers son regard
+    biais: 1.1,            // face: 'regard' : de combien, au plus, le carton se détourne du joueur (radians ; 1.1 = 63°). Au-delà il se réduirait à un trait
+    regardLibre: false,    // vrai : en marche il garde son regard au lieu de regarder où il va (un fantôme regarde où regarde le visiteur)
     regard: null,          // avec face 'camera' : direction dans laquelle il regarde (radians) ; null = il montre toujours sa face
     volteFace: 0,          // avec un regard : quand il montre son dos. C'est le cosinus de l'angle entre son regard et le joueur en dessous
                            // duquel il se retourne : 0 = dès que le joueur passe derrière ses épaules ; -0.5 = seulement 30° plus loin
@@ -1045,7 +1049,7 @@ var PNJ = (function () {
             } else if (etat.fin) { var f = etat.fin; etat.fin = null; f(pnj); }
           } else {
             poserEn(gp.x + dx / d * pas, gp.z + dz / d * pas);
-            if (etat.regard !== null) etat.regard = o.regard = Math.atan2(dx, dz);   // il regarde où il va
+            if (etat.regard !== null && !o.regardLibre) etat.regard = o.regard = Math.atan2(dx, dz);   // il regarde où il va
           }
         }
         if (etat.cible) {                                               // dandinement de marionnette en papier
@@ -1065,6 +1069,20 @@ var PNJ = (function () {
         var vers = camera ? Math.atan2(camera.position.x - gp.x, camera.position.z - gp.z) : 0;
         var perche = o.pose === 'tabouret';                             // perché : le buste se tourne vers le joueur même en attitude, les cuisses et les mains restent au comptoir
         if (enPose && !perche) { groupe.rotation.y = typeof etat.regard === 'number' ? etat.regard : etat.verrou; etat.sens = 1; }
+        else if (o.face === 'regard') {
+          // Il montre où il regarde : le carton se tourne vers son regard, recto d'un côté, verso de l'autre, comme planté dans le décor.
+          // Vu de côté il se réduirait à un trait : il ne se détourne pas du joueur de plus de o.biais. Il tourne en douceur ; quand le
+          // joueur passe de son côté face à son côté dos, il pivote par la tranche.
+          if (typeof etat.regard !== 'number') { groupe.rotation.y = vers; etat.sens = 1; }
+          else {
+            var ecart = Math.atan2(Math.sin(etat.regard - vers), Math.cos(etat.regard - vers)), dv = Math.cos(ecart);   // 0 : il regarde le joueur ; ±π : il lui tourne le dos
+            if (dv > 0.06) etat.sens = 1; else if (dv < -0.06) etat.sens = -1;
+            var bi = etat.sens > 0 ? ecart : Math.atan2(Math.sin(ecart - Math.PI), Math.cos(ecart - Math.PI));
+            bi = Math.max(-o.biais, Math.min(o.biais, bi));
+            var but = vers + (etat.sens > 0 ? 0 : Math.PI) + bi, reste = Math.atan2(Math.sin(but - groupe.rotation.y), Math.cos(but - groupe.rotation.y));
+            groupe.rotation.y += reste * Math.min(1, dt * 10);
+          }
+        }
         else if (o.face === 'camera') {
           if (etat.regard === null) etat.sens = 1;
           else {

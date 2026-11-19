@@ -404,7 +404,7 @@ body {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="pnj.js?v=0ee18fbe"></script>
+<script src="pnj.js?v=c3ad9162"></script>
 <script src="pipi.js?v=e6d0b8b6"></script>
 <script src="modeles.js?v=f30e200d"></script>
 <script src="signal.js?v=40755415"></script>
@@ -3683,6 +3683,7 @@ body {
   window.bodega.pnjTaille = { debout: PNJ_TAILLE, assis: PNJ_ASSIS, perche: PNJ_ASSIS };
   window.bodega.siege.rang = function () { return ASSISE.qui ? SIEGES.indexOf(ASSISE.qui) : -1; };   // le siège où le joueur est assis (-1 : debout)
   window.bodega.siege.tele = (function () { for (var i = 0; i < SIEGES.length; i++) if (Math.abs(SIEGES[i].ax - SIEGE.c[0]) < 0.01 && Math.abs(SIEGES[i].az - SIEGE.c[1]) < 0.01) return i; return -1; })();   // la chaise de la télé
+  window.bodega.tele.cap = function () { return tele.view ? tele.view.yaw : null; };   // devant la télé : le cap de la vue (sinon null)
   requestAnimationFrame(frame);
 })();
 </script>
@@ -4520,6 +4521,6 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
 })();
 </script>
 <script src="trace.js?v=4d48dd3f"></script>   <!-- le journal de visite : voir trace.js -->
-<script src="fantomes.js?v=1f371fa9"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
+<script src="fantomes.js?v=0c568739"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 </body>
 </html>

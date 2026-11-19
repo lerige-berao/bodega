@@ -2,7 +2,8 @@
 
    Un fantôme = le PNJ du bar dans sa tenue commune, à 65 % d'opacité (réglage « opacite »), avec une des têtes dessinées par Léo
    (pnj/tete3.png … tete30.png et leur dos), tirée au hasard pour chaque visiteur. On le traverse, on ne lui parle pas, le pipi
-   ne le touche pas. Il marche là où marche le visiteur, regarde où il regarde, s'assoit sur le siège où il s'assoit.
+   ne le touche pas. Il marche là où marche le visiteur, s'assoit sur le siège où il s'assoit, et se tourne là où il regarde : on
+   voit sa face quand il regarde vers soi, son dos quand il regarde ailleurs, et de quel côté il est tourné.
 
    Les vrais visiteurs : la page ouvre une connexion continue vers le relais (RELAIS, ci-dessous ; voir le dossier « salon »), lui
    envoie la position du joueur quand il bouge (cinq fois par seconde au plus) et reçoit celle des autres. Si le relais ne répond
@@ -103,7 +104,7 @@ var FANTOMES = (function () {
   // ---- Leur corps ----
   function incarner(f) {
     var t = TETES[f.tete];
-    f.pnj = B.pnj({ pos: [f.x, f.z], regard: f.a + Math.PI, fantome: R.opacite, solide: false, portee: 0,
+    f.pnj = B.pnj({ pos: [f.x, f.z], regard: f.a + Math.PI, face: 'regard', regardLibre: true, fantome: R.opacite, solide: false, portee: 0,
                     tete: t[0] + '.png', teteDos: t[0] + '-dos.png', cou: t[1], enfonce: t[2], grosseur: t[3] });
     f.pnj.voile(f.voile); f.pose = 0;
     if (siege(f)) poser(f, siege(f));
@@ -112,9 +113,16 @@ var FANTOMES = (function () {
   function poser(f, S) {                                                // assis : sur le siège, tourné comme le siège, à la taille des PNJ assis du bar
     var n = f.pnj, cap = S.cap;
     if (S.genre === 'banc' && !S.dossier && Math.cos(f.a - cap) < 0) cap += Math.PI;   // un banc sans dossier : du côté où il regardait en s'asseyant
-    n.placer(f.x, f.z); n.regarder(cap + Math.PI);
+    n.placer(f.x, f.z);
     if (S.genre === 'tabouret') { n.options.taille = taille('tabouret'); n.percher(S.h); } else { n.options.taille = taille('assis'); n.asseoir(S.h); }
     f.pose = f.s; f.cap = cap;
+  }
+  // Où il regarde : là où regarde le visiteur (le cap du joueur, retourné : un PNJ compte ses angles depuis +z). Assis sur une chaise,
+  // un banc ou une banquette, il ne se retourne pas tout à fait (70° de part et d'autre du siège) ; sur un tabouret il pivote librement.
+  function regard(f, S) {
+    if (!S || S.genre === 'tabouret') return f.a + Math.PI;
+    var e = Math.atan2(Math.sin(f.a - f.cap), Math.cos(f.a - f.cap));
+    return f.cap + Math.max(-1.2, Math.min(1.2, e)) + Math.PI;
   }
   function animer(f) {
     var n = f.pnj, S = siege(f), q = n.position(), dx = f.x - q[0], dz = f.z - q[1], d = Math.sqrt(dx * dx + dz * dz);
@@ -126,8 +134,9 @@ var FANTOMES = (function () {
       if (d > R.saut) n.placer(f.x, f.z);
       else if (d > 0.03) {
         if (f.neuf || !n.enMarche()) { n.options.vitesse = Math.max(0.5, Math.min(6, d / R.retard)); n.marcher(f.x, f.z); }
-      } else if (!n.enMarche()) n.regarder(f.a + Math.PI);              // arrêté : il regarde où regarde le visiteur
+      }
     }
+    n.regarder(regard(f, S));                                            // le PNJ tourne en douceur vers ce regard
     f.neuf = false;
   }
   function choisir() {                                                  // qui a droit à un corps : les plus proches du joueur
@@ -226,7 +235,8 @@ var FANTOMES = (function () {
     var v = B.view(), x = v.x, z = v.z, s = 0, S = B.siege, r;
     if (S && B.tele && B.tele.etat && B.tele.etat() !== 'salle' && S.tele >= 0 && S.liste[S.tele]) { s = S.tele + 1; x = S.liste[S.tele].ax; z = S.liste[S.tele].az; }   // devant la télé : sur sa chaise
     else if (S && S.rang) { r = S.rang(); if (r >= 0) s = r + 1; }
-    return { x: Math.round(x * 100), z: Math.round(z * 100), a: ((Math.round(v.yaw * 180 / Math.PI) % 360) + 360) % 360, s: s };
+    var cap = v.yaw; if (s && S.tele >= 0 && s === S.tele + 1 && B.tele.cap && typeof B.tele.cap() === 'number') cap = B.tele.cap();   // devant la télé : il regarde la télé
+    return { x: Math.round(x * 100), z: Math.round(z * 100), a: ((Math.round(cap * 180 / Math.PI) % 360) + 360) % 360, s: s };
   }
   function relayer(dt) {
     if (!net.url) return;
@@ -235,8 +245,8 @@ var FANTOMES = (function () {
     net.envoi -= dt; net.battement -= dt;
     if (net.envoi <= 0) {
       var e = moi(), d = net.dernier, da = d ? Math.abs(((e.a - d.a + 540) % 360) - 180) : 0;
-      // on n'envoie que ce qui change : un pas (2 cm), un regard (3°, sauf assis : le fantôme assis ne tourne pas la tête), un siège
-      if (!d || e.s !== d.s || Math.abs(e.x - d.x) > 2 || Math.abs(e.z - d.z) > 2 || (!e.s && da > 3)) {
+      // on n'envoie que ce qui change : un pas (2 cm), un regard (3°), un siège
+      if (!d || e.s !== d.s || Math.abs(e.x - d.x) > 2 || Math.abs(e.z - d.z) > 2 || da > 3) {
         try { net.ws.send(JSON.stringify({ t: 'p', x: e.x, z: e.z, a: e.a, s: e.s })); net.envoyes++; } catch (err) {}
         net.dernier = e; net.envoi = 0.2; net.battement = 25;
       }
