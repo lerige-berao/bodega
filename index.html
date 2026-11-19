@@ -404,7 +404,7 @@ body {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="pnj.js?v=bca84d9b"></script>
+<script src="pnj.js?v=0ee18fbe"></script>
 <script src="pipi.js?v=e6d0b8b6"></script>
 <script src="modeles.js?v=f30e200d"></script>
 <script src="signal.js?v=40755415"></script>
@@ -3648,6 +3648,7 @@ body {
       camera.rotation.x += (Math.random() - 0.5) * 0.11 * sk; camera.rotation.y += (Math.random() - 0.5) * 0.11 * sk; camera.position.y += (Math.random() - 0.5) * 0.05 * sk;
     }
     tournerAssis(dt); animerBarman(dt); animerCouple(dt); raler(dt);
+    if (window.FANTOMES) window.FANTOMES.maj(dt);               // les autres visiteurs, en fantômes : avant les PNJ, qui les animent
     if (window.PNJ) window.PNJ.maj(dt);                         // après la caméra : les PNJ se tournent vers elle
     renderer.render(scene, camera); dirty = false;
     drawMap();
@@ -3676,6 +3677,12 @@ body {
       var a = project(view, FACE.x - hw, FACE.y + hh, FACE.z, sr), b = project(view, FACE.x + hw, FACE.y - hh, FACE.z, sr);
       return [a[0] - R.left, a[1] - R.top, b[0] - R.right, b[1] - R.bottom, view.y, view.z - FACE.z];
     } };
+  // Pour fantomes.js : de quoi fabriquer un PNJ dans la tenue commune, et les tailles des PNJ du bar (debout ; assis, comme le Danois ;
+  // perché, la même qu'assis : la tête reste sous celle d'un fantôme debout).
+  window.bodega.pnj = function (o) { return creerPnj(o); };
+  window.bodega.pnjTaille = { debout: PNJ_TAILLE, assis: PNJ_ASSIS, perche: PNJ_ASSIS };
+  window.bodega.siege.rang = function () { return ASSISE.qui ? SIEGES.indexOf(ASSISE.qui) : -1; };   // le siège où le joueur est assis (-1 : debout)
+  window.bodega.siege.tele = (function () { for (var i = 0; i < SIEGES.length; i++) if (Math.abs(SIEGES[i].ax - SIEGE.c[0]) < 0.01 && Math.abs(SIEGES[i].az - SIEGE.c[1]) < 0.01) return i; return -1; })();   // la chaise de la télé
   requestAnimationFrame(frame);
 })();
 </script>
@@ -4513,5 +4520,6 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
 })();
 </script>
 <script src="trace.js?v=4d48dd3f"></script>   <!-- le journal de visite : voir trace.js -->
+<script src="fantomes.js?v=1f371fa9"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 </body>
 </html>

@@ -21,6 +21,13 @@
      PNJ.creer({ ..., enfonce: 0.17 });                                        // 0.17 = la hauteur que donne le bonnet
    De dos, le bonnet et la casquette gardent la même image (ou bonnetDos / casquetteDos si tu en fournis une) et la
    ceinture devient une bande de cuir sans boucle (ou ceintureDos).
+   Une tête dessinée avec de longs cheveux : on la grossit pour que le visage garde sa taille, et on l'enfonce pour que le
+   menton arrive au col, les cheveux tombant devant le t-shirt. cou règle où le cou tombe sous l'image.
+     PNJ.creer({ ..., tete: 'tete9.png', grosseur: 1.45, enfonce: 0.33, cou: 0.48 });
+
+   Un fantôme : le même PNJ, transparent. On le traverse et on ne lui parle pas si on le crée sans corps ni portée.
+     var f = PNJ.creer({ ..., fantome: 0.4, solide: false, portee: 0 });      // 0.4 = 40 % d'opacité
+     f.voile(0.5);                                                            // fondu : 0 = invisible, 1 = son opacité de fantôme
 
    Trois façons de le présenter au joueur :
      face: 'camera'                  il se tourne toujours vers le joueur, on ne voit que sa face (réglage par défaut)
@@ -134,6 +141,8 @@ var PNJ = (function () {
     cou: 0.5,              // où est le cou sous l'image de la tête, en part de sa largeur : 0.5 = au milieu ; à régler pour une tête
                            // qui dépasse d'un côté (un long museau). De dos, l'image est supposée en miroir : le cou passe à 1 - cou.
     enfonce: 0,            // de combien la tête descend dans le col, en hauteurs de tête : 0.17 = là où un bonnet la met
+    grosseur: 1,           // taille de la tête seule, sans toucher à l'échelle du corps : 1.3 pour une tête dont les cheveux prennent de la place
+    fantome: 0,            // 0 = PNJ ordinaire ; entre 0 et 1 = fantôme, à cette opacité (0.4 = 60 % transparent). Fixé à la création.
     portee: 1.6,           // distance, en mètres, en dessous de laquelle le joueur peut lui parler
     voix: {
       hauteur: 105,        // note de base, en Hz : 85 = très grave, 130 = voix claire
@@ -290,7 +299,7 @@ var PNJ = (function () {
       H[nom] = Math.max(2, Math.round(part * px));
       L[nom] = Math.max(2, Math.round(H[nom] * (calques[nom] ? calques[nom].w / calques[nom].h : FORME[nom])));
     }
-    mesurer('tete', p.tete); mesurer('tshirt', p.tshirt); mesurer('pantalon', p.pantalon);
+    mesurer('tete', p.tete * Math.max(0.2, o.grosseur)); mesurer('tshirt', p.tshirt); mesurer('pantalon', p.pantalon);   // la tête grossit seule : le corps garde son échelle
     mesurer('chaussure', p.chaussure); mesurer('semelle', A.semelle);
     // Accessoires : la boîte de chaque coiffe par rapport à la tête, et la ceinture par rapport au pantalon
     var AC = o.accessoires, coiffes = [], monte = 0, lCoiffe = 0, ceint = null;
@@ -768,8 +777,14 @@ var PNJ = (function () {
                 teteDos: o.teteDos, tshirtDos: o.tshirtDos, pantalonDos: o.pantalonDos,
                 ceinture: o.ceinture, bonnet: o.bonnet, casquette: o.casquette, ceintureDos: o.ceintureDos, bonnetDos: o.bonnetDos, casquetteDos: o.casquetteDos };
     var groupe = new T3.Group(), corps = new T3.Group(), morceaux = {}, repos = null;
+    var spectre = (o.fantome > 0 && o.fantome < 1) ? o.fantome : 0;    // un fantôme : matières transparentes, dessinées dans un ordre choisi (voir ordonner)
+    function matiere(cote) {
+      var m = new T3.MeshBasicMaterial({ map: texture(toile(2, 2)), alphaTest: spectre ? 0.25 * spectre : 0.5, side: cote, color: o.teinte });
+      if (spectre) { m.transparent = true; m.opacity = spectre; }
+      return m;
+    }
     ['bas', 'torse', 'tete', 'cuisses'].forEach(function (nom) {       // recto verso par la géométrie ; apparaissent dès que les images sont là
-      var m = new T3.Mesh(GEO, new T3.MeshBasicMaterial({ map: texture(toile(2, 2)), alphaTest: 0.5, side: T3.FrontSide, color: o.teinte }));
+      var m = new T3.Mesh(GEO, matiere(T3.FrontSide));
       m.visible = false; if (nom !== 'cuisses') corps.add(m); morceaux[nom] = m;   // « cuisses » ne sert qu'à porter la toile du haut du pantalon
     });
     // Sur un tabouret, le bas du corps est fait de quatre bandes, deux par jambe du pantalon : une cuisse accrochée au pli de la
@@ -783,7 +798,7 @@ var PNJ = (function () {
     });
     groupe.add(corps); scene.add(groupe);
     // Deux mains à deux faces : une seule matière, la main de droite est le miroir de celle de gauche.
-    var matMain = new T3.MeshBasicMaterial({ map: texture(toile(2, 2)), alphaTest: 0.5, side: T3.FrontSide, color: o.teinte });
+    var matMain = matiere(T3.FrontSide);
     var mains = [-1, 1].map(function (cote) {
       var m = new T3.Mesh(GEO_MAIN, matMain);
       m.rotation.order = 'ZYX';                                         // le demi-tour se fait autour de l'axe de la main, pas du corps
@@ -792,7 +807,7 @@ var PNJ = (function () {
     });
     var attache = null;                                                 // où flottent les mains au repos (mètres), ou null s'il n'en a pas
     // Les mains jointes : une seule image à plat, devant le ventre, qui remplace les deux mains quand il les joint.
-    var joint = new T3.Mesh(GEO_PLAT, new T3.MeshBasicMaterial({ map: texture(toile(2, 2)), alphaTest: 0.5, side: T3.DoubleSide, color: o.teinte }));
+    var joint = new T3.Mesh(GEO_PLAT, matiere(T3.DoubleSide));
     joint.visible = false; groupe.add(joint);
     var jointes = null;                                                 // leur taille (mètres), ou null s'il n'a pas cette image
     var depart = point(o.pos !== undefined ? o.pos : o.x || 0, o.z || 0);
@@ -887,6 +902,30 @@ var PNJ = (function () {
         return pnj;
       },
       deDos: function () { return etat.cote < 0; },                     // le joueur voit-il son dos en ce moment ?
+      // Fantôme : son fondu. k = 0 (invisible) à 1 (son opacité de fantôme). Sans effet sur un PNJ ordinaire.
+      voile: function (k) {
+        if (!spectre) return pnj;
+        var op = spectre * Math.max(0, Math.min(1, k)), nm;
+        for (nm in morceaux) morceaux[nm].material.opacity = op;
+        matMain.opacity = op; joint.material.opacity = op;
+        return pnj;
+      },
+      fantome: function () { return spectre; },
+      // Fantôme : le rang de dessin de ses morceaux, de l'avant vers l'arrière. Les mains flottent devant le corps, la tête passe
+      // devant le t-shirt ; debout le pantalon est derrière le t-shirt, assis il est devant ; perché, les cuisses partent vers le
+      // comptoir : devant le buste si le joueur est de ce côté-là, derrière sinon.
+      _ordonner: function (base) {
+        var pas = 0.1, devant = true, rJambes, rTorse;                  // des dixièmes : tous les fantômes tiennent entre 10 et 20
+        mains.forEach(function (m) { m.plan.renderOrder = base; }); joint.renderOrder = base;
+        morceaux.tete.renderOrder = base + pas;
+        if (o.pose === 'tabouret') {
+          if (typeof etat.regard === 'number' && camera) devant = Math.cos(Math.atan2(camera.position.x - groupe.position.x, camera.position.z - groupe.position.z) - etat.regard) > 0;
+          rJambes = base + (devant ? 2 : 3) * pas; rTorse = base + (devant ? 3 : 2) * pas;
+        } else if (o.pose === 'assis') { rJambes = base + 2 * pas; rTorse = base + 3 * pas; }
+        else { rTorse = base + 2 * pas; rJambes = base + 3 * pas; }
+        morceaux.torse.renderOrder = rTorse; morceaux.bas.renderOrder = rJambes;
+        jambes.forEach(function (j) { j.cuisse.renderOrder = rJambes; j.bas.renderOrder = rJambes; });
+      },
       // Va chercher une bouteille sous le comptoir et la pose dessus, une fois. comptoir = { hauteur, distance, direction }, facultatif.
       // fin(pnj, bouteille) est appelée quand la bouteille est posée.
       servir: function (comptoir, fin) {
@@ -1253,6 +1292,17 @@ var PNJ = (function () {
     maj: function (dt) {
       if (!(dt > 0)) dt = 0;                                            // un pas de temps nul, négatif ou invalide ne fait rien bouger
       horloge += dt; for (var i = 0; i < tous.length; i++) tous[i]._maj(dt);
+      // Les fantômes : après tout le décor (rangs 10 à 20 : avant la main du joueur devant la télé, qui commence à 20), du plus
+      // proche du joueur au plus lointain. Un fantôme en cache donc un autre au lieu de s'y mêler, et aucun morceau n'est peint deux fois.
+      var spectres = null, k;
+      for (i = 0; i < tous.length; i++) if (tous[i].fantome()) (spectres || (spectres = [])).push(tous[i]);
+      if (spectres) {
+        if (camera) {
+          for (k = 0; k < spectres.length; k++) { var gp = spectres[k].groupe.position, dx = camera.position.x - gp.x, dz = camera.position.z - gp.z; spectres[k]._loin = dx * dx + dz * dz; }
+          spectres.sort(function (a, b) { return a._loin - b._loin; });
+        }
+        for (k = 0; k < spectres.length; k++) spectres[k]._ordonner(10 + Math.min(k, 24) * 0.4);
+      }
     },
     // Le PNJ le plus proche du joueur parmi ceux qui sont à portée, ou null.
     proche: function () {
