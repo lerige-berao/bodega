@@ -92,7 +92,7 @@ var FANTOMES = (function () {
                  nom: propre(e.nom) || (vieux ? vieux.nom : ''), etiq: vieux ? vieux.etiq : null,
                  pnj: vieux ? vieux.pnj : null, voile: vieux ? vieux.voile : 0, pose: vieux ? vieux.pose : 0, cap: vieux ? vieux.cap : 0,
                  elu: false, part: false, neuf: true, loin: 0 };
-    if (vieux && vieux.tete !== tous[id].tete && vieux.pnj) { oterEtiquette(tous[id]); vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
+    if (vieux && vieux.tete !== tous[id].tete && vieux.pnj) { oterEtiquette(tous[id]); oterBulle(vieux); vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
     tri = 0;
     return api;
   }
@@ -206,6 +206,50 @@ var FANTOMES = (function () {
     E.m.material.opacity = ETIQ.opacite * Math.max(0, Math.min(1, f.voile));
     E.m.visible = te.visible && f.voile > 0.02;
   }
+  function texteBulle(txt) {
+    var mots = txt.split(' '), lignes = [], l = '', i, MAXC = 22;
+    for (i = 0; i < mots.length; i++) {
+      var m = mots[i];
+      while (Array.from(m).length > MAXC) { if (l) { lignes.push(l); l = ''; } lignes.push(Array.from(m).slice(0, MAXC).join('')); m = Array.from(m).slice(MAXC).join(''); }
+      if (!l) l = m; else if (Array.from(l + ' ' + m).length <= MAXC) l += ' ' + m; else { lignes.push(l); l = m; }
+    }
+    if (l) lignes.push(l);
+    if (lignes.length > 4) { lignes = lignes.slice(0, 4); lignes[3] = Array.from(lignes[3]).slice(0, MAXC - 1).join('') + '…'; }
+    var c = document.createElement('canvas'), g = c.getContext('2d'), P = ETIQ.police, font = P + 'px "Courier New", Courier, monospace', lh = P + 3;
+    g.font = font;
+    var w = 0; lignes.forEach(function (x) { w = Math.max(w, g.measureText(x).width); });
+    var L = Math.ceil(w) + 12, H = lignes.length * lh + 9 + 5;
+    c.width = L; c.height = H; g = c.getContext('2d'); g.font = font;
+    g.fillStyle = 'rgba(244, 234, 210, 0.92)'; g.fillRect(0, 0, L, H - 5);                    // la bulle, et sa pointe vers la tête
+    g.beginPath(); g.moveTo(L / 2 - 5, H - 5); g.lineTo(L / 2 + 5, H - 5); g.lineTo(L / 2, H); g.closePath(); g.fill();
+    g.fillStyle = '#17100b'; g.textBaseline = 'top'; g.textAlign = 'center';
+    lignes.forEach(function (x, k) { g.fillText(x, L / 2, 5 + k * lh); });
+    var t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    return { tex: t, l: L, h: H };
+  }
+  function bullifier(f, dt) {                                           // la bulle de ce qu'il vient de dire, au-dessus de son étiquette
+    var b = f.bulle, p = f.pnj;
+    if (!b) return;
+    b.t -= dt;
+    if (b.t <= 0 || !p || !f.etiq || muets[f.id.slice(2)]) { oterBulle(f); return; }
+    if (b.vu !== b.txt || (b.mesh && b.mesh.parent !== p.groupe)) {
+      if (b.mesh) { if (b.mesh.parent) b.mesh.parent.remove(b.mesh); try { b.mesh.material.map.dispose(); b.mesh.material.dispose(); b.mesh.geometry.dispose(); } catch (e) {} }
+      var t = texteBulle(b.txt), k = ETIQ.haut * 0.95 / (ETIQ.police + 5);              // même taille de lettre que l'étiquette
+      b.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: t.tex, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+      b.mesh.scale.set(t.l * k, t.h * k, 1); b.mesh.renderOrder = 19.95; b.vu = b.txt;
+      p.groupe.add(b.mesh);
+    }
+    var E = f.etiq.m;
+    b.mesh.position.set(0, E.position.y + ETIQ.haut / 2 + 0.03 + b.mesh.scale.y / 2, 0);
+    b.mesh.rotation.y = E.rotation.y;
+    b.mesh.material.opacity = Math.min(1, b.t / 0.5) * Math.max(0, Math.min(1, f.voile));
+    b.mesh.visible = E.visible;
+  }
+  function oterBulle(f) {
+    var b = f && f.bulle; if (!b) return;
+    if (b.mesh) { if (b.mesh.parent) b.mesh.parent.remove(b.mesh); try { b.mesh.material.map.dispose(); b.mesh.material.dispose(); b.mesh.geometry.dispose(); } catch (e) {} }
+    f.bulle = null;
+  }
   function oterEtiquette(f) {
     var E = f && f.etiq; if (!E) return;
     if (E.m.parent) E.m.parent.remove(E.m);
@@ -263,8 +307,8 @@ var FANTOMES = (function () {
         if (!f.part) animer(f);
         f.voile += Math.max(-pas, Math.min(pas, cible - f.voile));
         f.pnj.voile(f.voile);
-        etiqueter(f);
-        if (!cible && f.voile <= 0) { oterEtiquette(f); f.pnj.retirer(); f.pnj = null; f.pose = 0; }
+        etiqueter(f); bullifier(f, dt);
+        if (!cible && f.voile <= 0) { oterBulle(f); oterEtiquette(f); f.pnj.retirer(); f.pnj = null; f.pose = 0; }
       }
       if (f.part && !f.pnj) { lacher(f); delete tous[id]; }
     }
@@ -276,13 +320,30 @@ var FANTOMES = (function () {
   // des nombres vérifiés, un nombre de fantômes plafonné, rien d'autre que des positions.
   var DELAIS = [1, 2, 5, 10, 30, 60, 60, 60, 300];                      // secondes avant de réessayer, d'échec en échec
   var net = { url: '', ws: null, etat: 'ferme', id: null, nom: null, tete: null, essais: 0, attente: 0, envoi: 0, battement: 0,
-              dernier: null, envoyes: 0, recus: 0, pause: false, plein: false, veille: 0 };
+              dernier: null, envoyes: 0, recus: 0, pause: false, plein: false, veille: 0, chat: true, expulse: false };
+  var ecouteurs = [], muets = {};                                       // le chat : qui écoute (chat.js), qui est masqué (sur cette page seulement)
+  function prevenir(m) { for (var i = 0; i < ecouteurs.length; i++) { try { ecouteurs[i](m); } catch (e) {} } }
   function purger() { for (var id in tous) if (id.slice(0, 2) === 'r:') tous[id].part = true; }
   function distants() { var n = 0; for (var id in tous) if (id.slice(0, 2) === 'r:' && !tous[id].part) n++; return n; }
   function venir(id, tete, nom, x, z, a, s, k, h) {
     if (typeof id !== 'string' || !id || id.length > 12 || id === net.id || distants() >= 40) return;
     arrive('r:' + id, { tete: nombre(tete, 0), x: nombre(x, 0) / 100, z: nombre(z, 0) / 100, a: nombre(a, 0) * Math.PI / 180, s: nombre(s, 0), k: nombre(k, 0), h: nombre(h, 0) * Math.PI / 180 });
     if (tous['r:' + id]) tous['r:' + id].nom = propre(nom);
+  }
+  function propre140(v) {                                               // un message du chat affichable (140 caractères au plus)
+    if (typeof v !== 'string') return '';
+    var n = (v.normalize ? v.normalize('NFC') : v).replace(/[\t\n\r\f\v]/g, ' ').replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+    return Array.from(n).slice(0, 140).join('').trim();
+  }
+  function envoyerChat(txt) {
+    txt = propre140(txt);
+    if (!txt || !net.ws || net.etat !== 'ouvert' || !net.id) return false;
+    try { net.ws.send(JSON.stringify({ t: 'm', txt: txt })); return true; } catch (e) { return false; }
+  }
+  function ordonner(cle, ordre, id) {
+    if (!net.ws || net.etat !== 'ouvert' || typeof cle !== 'string' || !cle) return false;
+    var o = { t: 'admin', cle: cle, ordre: ordre }; if (id) o.id = id;
+    try { net.ws.send(JSON.stringify(o)); return true; } catch (e) { return false; }
   }
   function monPseudo() {                                                 // celui tapé à l'entrée, sinon le dernier gardé dans ce navigateur
     var I = window.BodegaIntro, p = I && I.pseudo ? I.pseudo : '';
@@ -295,7 +356,7 @@ var FANTOMES = (function () {
     if (!m || typeof m !== 'object') return;
     net.recus++;
     if (m.t === 'w') {                                                  // bienvenue : qui l'on est, qui est déjà là
-      net.id = String(m.id); net.nom = String(m.nom || ''); net.tete = nombre(m.tete, 0); net.dernier = null; net.envoi = 0;
+      net.id = String(m.id); net.nom = String(m.nom || ''); net.chat = m.chat !== false; net.tete = nombre(m.tete, 0); net.dernier = null; net.envoi = 0;
       purger();
       (m.les instanceof Array ? m.les : []).slice(0, 40).forEach(function (l) { if (l instanceof Array && l.length >= 7) venir(l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8]); });
       var ps = monPseudo();                                             // le pseudo tapé à l'entrée : il remplace « Guest n » chez les autres
@@ -304,6 +365,17 @@ var FANTOMES = (function () {
     else if (m.t === 'p') { if (typeof m.id === 'string' && tous['r:' + m.id]) bouge('r:' + m.id, { x: nombre(m.x, 0) / 100, z: nombre(m.z, 0) / 100, a: nombre(m.a, 0) * Math.PI / 180, s: nombre(m.s, 0), k: nombre(m.k, 0), h: nombre(m.h, 0) * Math.PI / 180 }); }
     else if (m.t === 'n') { if (typeof m.id === 'string' && tous['r:' + m.id] && propre(m.nom)) tous['r:' + m.id].nom = propre(m.nom); }   // il donne son pseudo
     else if (m.t === '-') { if (typeof m.id === 'string') part('r:' + m.id); }
+    else if (m.t === 'm') {                                             // un message du chat
+      if (typeof m.id !== 'string' || typeof m.txt !== 'string') return;
+      var txt = propre140(m.txt), qui = tous['r:' + m.id], nom = propre(m.nom) || (qui ? qui.nom : '') || '?';
+      if (!txt) return;
+      if (qui && !muets[m.id]) qui.bulle = { txt: txt, t: Math.min(9, 4 + Array.from(txt).length / 15), mesh: qui.bulle ? qui.bulle.mesh : null, vu: '' };
+      prevenir({ t: 'm', id: m.id, nom: nom, txt: txt, moi: m.id === net.id });
+    }
+    else if (m.t === 'chat') { net.chat = m.ouvert !== false; prevenir({ t: 'chat', ouvert: net.chat }); }
+    else if (m.t === 'refus') prevenir({ t: 'refus', pourquoi: String(m.pourquoi || '') });
+    else if (m.t === 'admin') prevenir({ t: 'admin', ok: !!m.ok, chat: m.chat !== false });
+    else if (m.t === 'expulse') { net.expulse = true; prevenir({ t: 'expulse' }); deconnecter(); }   // expulsé : on ne revient pas tout seul
     else if (m.t === 'plein') net.plein = true;                         // la salle est pleine : on réessaiera plus tard
   }
   function ouvrir() {
@@ -519,6 +591,18 @@ var FANTOMES = (function () {
   var api = {
     arrive: arrive, bouge: bouge, part: part, vider: vider, maj: maj, reglages: R, tetes: TETES, enPanne: function () { return panne; },
     connecter: connecter, deconnecter: deconnecter,
+    // le chat (pour chat.js) : envoyer un message, écouter ce qui arrive, masquer quelqu'un (ici seulement), modérer avec la clé
+    chat: {
+      envoyer: envoyerChat,
+      ecouter: function (f) { if (typeof f === 'function') ecouteurs.push(f); },
+      pret: function () { return net.etat === 'ouvert' && !!net.id; },
+      ouvert: function () { return net.chat; },
+      expulse: function () { return net.expulse; },
+      moi: function () { return { id: net.id, nom: net.nom }; },
+      muet: function (id, oui) { if (oui) muets[id] = true; else delete muets[id]; },
+      estMuet: function (id) { return !!muets[id]; },
+      admin: ordonner
+    },
     reseau: function () { return { url: net.url, etat: net.etat, id: net.id, nom: net.nom, tete: net.tete, essais: net.essais, attente: net.attente, envoyes: net.envoyes, recus: net.recus, distants: distants() }; },
     demo: function (n, graine) { return lancerDemo(n, graine); },
     enDemo: function () { return demo ? demo.gens.length : 0; },
@@ -527,7 +611,7 @@ var FANTOMES = (function () {
       var l = [], id, f, q;
       for (id in tous) {
         f = tous[id]; q = f.pnj ? f.pnj.position() : null;
-        l.push({ id: id, nom: f.nom || null, etiquette: f.etiq ? { nom: f.etiq.nom, visible: f.etiq.m.visible, y: f.etiq.m.position.y, opacite: f.etiq.m.material.opacity } : null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
+        l.push({ id: id, nom: f.nom || null, bulle: f.bulle ? { txt: f.bulle.txt, visible: !!(f.bulle.mesh && f.bulle.mesh.visible), y: f.bulle.mesh ? f.bulle.mesh.position.y : null } : null, etiquette: f.etiq ? { nom: f.etiq.nom, visible: f.etiq.m.visible, y: f.etiq.m.position.y, opacite: f.etiq.m.material.opacity } : null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
                  px: q ? q[0] : null, pz: q ? q[1] : null, pose: f.pnj ? f.pnj.options.pose : null, marche: f.pnj ? f.pnj.enMarche() : false });
       }
       return l;
