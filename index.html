@@ -1532,6 +1532,7 @@ body {
   })();
 
   /* ---------- Toilettes ---------- */
+  var MIROIR = { glace: null };                                     // la glace du miroir : miroir.js y pose le reflet
   slab(P(660, 364), P(738, 354), 0.04, 0, 2.0, M.door);           // porte entrouverte
   (function () {
     var zw = P(0, 211)[1] + 0.065, x, c;
@@ -1541,7 +1542,7 @@ body {
     mesh(boxG(0.34, 0.012, 0.22), M.glass, x, 0.852, zw + 0.18);
     mesh(merged([[boxG(0.03, 0.1, 0.03), 0, 0.9, 0.04], [boxG(0.03, 0.03, 0.1), 0, 0.94, 0.08]]), M.chrome, x, 0, zw);
     mesh(boxG(0.46, 0.6, 0.02), M.wood, x, 1.5, zw + 0.012);
-    plane(0.4, 0.54, x, 1.5, zw + 0.024, 0, M.mirror);
+    MIROIR.glace = plane(0.4, 0.54, x, 1.5, zw + 0.024, 0, M.mirror);
     collide([x - 0.15, zw + 0.17], [x + 0.15, zw + 0.17], 0.17, 0.86);
     // Le tag BERAO, à la bombe noire : 1,30 m de large, du miroir au mur plein (4,75 m). Sa boucle est sur l'enduit au-dessus du
     // miroir ; sa première lettre et ses coulures mordent le coin haut droit du miroir (cadre et glace) ; à droite, la pointe de son
@@ -3652,6 +3653,7 @@ body {
     tournerAssis(dt); animerBarman(dt); animerCouple(dt); raler(dt);
     if (window.FANTOMES) window.FANTOMES.maj(dt);               // les autres visiteurs, en fantômes : avant les PNJ, qui les animent
     if (window.PNJ) window.PNJ.maj(dt);                         // après la caméra : les PNJ se tournent vers elle
+    if (window.MIROIR) window.MIROIR.maj(dt);                   // le reflet du miroir des toilettes, s'il est à l'écran : voir miroir.js
     renderer.render(scene, camera); dirty = false;
     drawMap();
 
@@ -3685,6 +3687,7 @@ body {
   window.bodega.pnjTaille = { debout: PNJ_TAILLE, assis: PNJ_ASSIS, perche: PNJ_ASSIS };
   window.bodega.siege.rang = function () { return ASSISE.qui ? SIEGES.indexOf(ASSISE.qui) : -1; };   // le siège où le joueur est assis (-1 : debout)
   window.bodega.siege.tele = (function () { for (var i = 0; i < SIEGES.length; i++) if (Math.abs(SIEGES[i].ax - SIEGE.c[0]) < 0.01 && Math.abs(SIEGES[i].az - SIEGE.c[1]) < 0.01) return i; return -1; })();   // la chaise de la télé
+  window.bodega.miroir = { glace: MIROIR.glace, renderer: renderer, scene: scene, camera: camera };   // pour miroir.js
   window.bodega.tele.cap = function () { return tele.view ? tele.view.yaw : null; };   // devant la télé : le cap de la vue (sinon null)
   window.bodega.jet = function () { return window.PIPI ? window.PIPI.creer({ THREE: THREE, scene: scene, camera: camera, colliders: colliders, pitchMax: 1.25, baisser: 0, yeux: EYE }) : null; };   // le jet de pipi d'un autre visiteur : pour l'œil seulement
   requestAnimationFrame(frame);
@@ -4526,5 +4529,6 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
 <script src="trace.js?v=38524a08"></script>   <!-- le journal de visite : voir trace.js -->
 <script src="fantomes.js?v=60ea5c77"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 <script src="chat.js?v=fe2de6c4"></script>   <!-- le chat, en bas à droite : voir chat.js -->
+<script src="miroir.js?v=45298bfc"></script>   <!-- on se voit dans le miroir des toilettes : voir miroir.js -->
 </body>
 </html>
