@@ -25,6 +25,8 @@
    menton arrive au col, les cheveux tombant devant le t-shirt. cou règle où le cou tombe sous l'image.
      PNJ.creer({ ..., tete: 'tete9.png', grosseur: 1.45, enfonce: 0.33, cou: 0.48 });
 
+   Boire une bière au goulot (un geste de 6 s ; une bouteille apparaît dans sa main, puis disparaît) :
+     leo.boire(6); leo.boit();                                // boit() : le geste en cours ({ t, duree }) ou null
    Un fantôme : le même PNJ, transparent. On le traverse et on ne lui parle pas si on le crée sans corps ni portée.
      var f = PNJ.creer({ ..., fantome: 0.4, solide: false, portee: 0 });      // 0.4 = 40 % d'opacité
      f.voile(0.5);                                                            // fondu : 0 = invisible, 1 = son opacité de fantôme
@@ -116,6 +118,8 @@ var PNJ = (function () {
   'use strict';
 
   var T3 = null, scene = null, camera = null, colliders = null, dossier = '';
+  var BOIRE_BOUCHE = 0.06;                                            // le coin de la bouche, au-dessus du col du t-shirt (mètres)
+  var BOIRE_MAIN = [-0.8, 0.075, Math.PI, Math.PI / 2 - 0.12];        // la main qui la tient : son poignet (x en longueurs de main, y en mètres le long de la bouteille), demi-tour, doigts autour d'elle
   var tous = [], images = {}, GEO = null, GEO_G = null, GEO_D = null, GEO_MAIN = null, GEO_PLAT = null, fabriqueBouteille = null, horloge = 0, audio = null, bruit = null, banques = [];
   var CALQUES = ['tete', 'tshirt', 'pantalon', 'chaussure', 'semelle', 'main', 'paume', 'mainsJointes', 'teteDos', 'tshirtDos', 'pantalonDos',
                  'ceinture', 'bonnet', 'casquette', 'ceintureDos', 'bonnetDos', 'casquetteDos'];
@@ -817,8 +821,18 @@ var PNJ = (function () {
     var depart = point(o.pos !== undefined ? o.pos : o.x || 0, o.z || 0);
     var col = (o.solide && colliders) ? { ax: 0, az: 0, bx: 0, bz: 0, pad: o.rayon } : null;
     if (col) colliders.push(col);
-    var etat = { cible: null, file: null, rang: 0, pause: 0, attente: 0, pas: 0, graine: tous.length * 1.7, tirage: 0, fin: null, socle: 0, geste: 0, joint: 0, forceJoint: false, sens: 1, cote: 1, att: 0, attNom: o.attitude || null, verrou: 0, props: null, service: null, servies: [], nbServies: 0, regard: (typeof o.regard === 'number') ? o.regard : null, voix: null, replique: 0, numero: tous.length, banque: null, sac: [], derniere: -1 };
+    var etat = { cible: null, file: null, rang: 0, pause: 0, attente: 0, pas: 0, graine: tous.length * 1.7, tirage: 0, fin: null, socle: 0, geste: 0, joint: 0, forceJoint: false, sens: 1, cote: 1, att: 0, attNom: o.attitude || null, verrou: 0, voileK: 1, boisson: null, props: null, service: null, servies: [], nbServies: 0, regard: (typeof o.regard === 'number') ? o.regard : null, voix: null, replique: 0, numero: tous.length, banque: null, sac: [], derniere: -1 };
 
+    // La bouteille qu'il boit : à lui seul, la matière est copiée (on la fond avec lui ; un fantôme la rend transparente, dessinée
+    // avec ses mains). Le modèle de la page peut arriver un peu après : on rhabille ce qui est nouveau à chaque image.
+    function habiller(DB) {
+      DB.objet.traverse(function (m) {
+        if (!m.isMesh || !m.material || Array.isArray(m.material) || m.__biere) return;
+        m.__biere = true; m.material = m.material.clone();
+        if (spectre) { m.material.transparent = true; m.material.opacity = spectre * etat.voileK; m.renderOrder = etat.rangMains || 0; }
+        DB.mats.push(m.material);
+      });
+    }
     function poserEn(x, z) {
       groupe.position.set(x, 0, z);
       if (col) { col.ax = col.bx = x; col.az = col.bz = z; }
@@ -842,7 +856,7 @@ var PNJ = (function () {
             j.cuisse.visible = j.bas.visible = !!pc;
             if (pc) { j.cuisse.scale.set(pc.l / 2, pc.h, 1); j.bas.scale.set(pb.l / 2, pb.h, 1); }
           });
-          repos = { bas: pb.y, torse: r.parties.torse.y, cou: r.parties.tete.y - r.parties.torse.y, ourlet: r.ourlet, demi: r.demiTshirt, hTorse: r.parties.torse.h,
+          repos = { hTete: r.parties.tete.h, bas: pb.y, torse: r.parties.torse.y, cou: r.parties.tete.y - r.parties.torse.y, ourlet: r.ourlet, demi: r.demiTshirt, hTorse: r.parties.torse.h,
                     cuisse: pc ? pc.h : 0, jean: pc ? pc.l : 0, jambe: pb.h, pieds: pb.l };
           // assis : le bas du corps est posé au bord de l'assise ; sur un tabouret : l'ourlet du t-shirt (le pli des hanches) est juste au-dessus
           etat.socle = o.pose === 'assis' ? o.siege - o.assis.descend : o.pose === 'tabouret' ? o.siege + o.tabouret.monte - r.ourlet : 0;
@@ -910,6 +924,8 @@ var PNJ = (function () {
       voile: function (k) {
         if (!spectre) return pnj;
         var op = spectre * Math.max(0, Math.min(1, k)), nm;
+        etat.voileK = Math.max(0, Math.min(1, k));
+        if (etat.boisson) etat.boisson.mats.forEach(function (m) { m.opacity = op; });
         for (nm in morceaux) morceaux[nm].material.opacity = op;
         matMain.opacity = op; joint.material.opacity = op;
         return pnj;
@@ -921,6 +937,8 @@ var PNJ = (function () {
       _ordonner: function (base) {
         var pas = 0.1, devant = true, rJambes, rTorse;                  // des dixièmes : tous les fantômes tiennent entre 10 et 20
         mains.forEach(function (m) { m.plan.renderOrder = base; }); joint.renderOrder = base;
+        etat.rangMains = base;
+        if (etat.boisson) etat.boisson.objet.traverse(function (m) { if (m.isMesh) m.renderOrder = base; });   // la bouteille, avec les mains
         morceaux.tete.renderOrder = base + pas;
         if (o.pose === 'tabouret') {
           if (typeof etat.regard === 'number' && camera) devant = Math.cos(Math.atan2(camera.position.x - groupe.position.x, camera.position.z - groupe.position.z) - etat.regard) > 0;
@@ -957,6 +975,16 @@ var PNJ = (function () {
         return pnj;
       },
       sert: function () { return !!etat.service; },
+      // Boire une bière au goulot : un geste de « duree » secondes (6 par défaut), un à la fois.
+      boire: function (duree) {
+        if (etat.boisson) return pnj;
+        var b = bouteille();
+        b.visible = false; groupe.add(b);
+        etat.boisson = { t: 0, duree: Math.max(2, duree || 6), objet: b, mats: [], gel: false };
+        habiller(etat.boisson);
+        return pnj;
+      },
+      boit: function () { return etat.boisson || null; },
       // Garde les mains jointes (true) ou les relâche (false), en dehors de la parole. Sans image de mains jointes, sans effet.
       joindre: function (oui) { etat.forceJoint = !!oui; return pnj; },
       mainsJointes: function () { return joint.visible; },
@@ -1126,6 +1154,22 @@ var PNJ = (function () {
           B = cle(S.cles, S.t);
           penche += (B[3] - penche) * ws; incline *= 1 - ws;
         }
+        // Il boit : wb = 0 à 1, poids du geste ; Q = [x, y, z du cul de la bouteille, bascule dans le plan du carton (0 = droite,
+        // positive : le goulot part vers son autre épaule)]. Le goulot vient au coin de sa bouche, juste au-dessus du col.
+        var DB = etat.boisson, wb = 0, Q = null;
+        if (DB && !DB.gel) DB.t += dt;                                  // le temps passe, même avant que ses images soient là
+        if (DB && repos) {
+          habiller(DB);                                                 // une bouteille, quelques morceaux : ne coûte presque rien
+          var u = DB.t * 6 / DB.duree, Lb = 0.23, bo = corps.position.y + repos.torse + repos.hTorse + BOIRE_BOUCHE, zb = corps.position.z + 0.07;
+          var aBouche = function (r) { return [0.025 + Lb * Math.sin(r), bo - Lb * Math.cos(r), zb, r]; };   // la bascule r, le goulot aux lèvres
+          var gorgee = u > 2.3 && u < 3.9 ? Math.pow(Math.sin(Math.PI * (u - 2.3) / 0.53), 2) : 0;   // trois gorgées
+          var r1 = aBouche(1.95), r2 = aBouche(2.45);
+          Q = cle([[0.0, 0.25, bo - 0.62, 0.10, 0], [1.0, 0.21, bo - 0.34, 0.14, 0.25], [1.7].concat(r1), [2.3].concat(r1), [3.9].concat(r2),
+                   [4.5, 0.21, bo - 0.30, 0.14, 0.25], [5.4, 0.25, bo - 0.62, 0.10, 0], [6.0, 0.25, bo - 0.62, 0.10, 0]], u);
+          if (u > 2.3 && u < 3.9) { var rg = Q[3] + 0.07 * gorgee; Q = aBouche(rg); }
+          wb = Math.max(0, Math.min(1, u / 0.35, (6 - u) / 0.5)); wb = wb * wb * (3 - 2 * wb);
+          incline += (-0.12 * Math.max(0, Math.min(1, (u - 1.5) / 0.4, (4.6 - u) / 0.4)) - incline) * wb;   // la tête part un peu en arrière
+        }
         if (repos) {
           var fin = 0.004 * cote;                                       // un cheveu d'écart, pour que chaque morceau passe devant le précédent
           if (perche && repos.cuisse) {
@@ -1220,6 +1264,12 @@ var PNJ = (function () {
               px += (s[0] - px) * ws; py += (s[1] - py) * ws; pz += (s[2] - pz) * ws;
               rX += (s[3] - rX) * ws; rY += (s[4] - rY) * ws; rZ += (s[5] - rZ) * ws;
             }
+            if (Q && c > 0 && wb > 0.001) {
+              var cq = Math.cos(Q[3]), sq = Math.sin(Q[3]), ox = BOIRE_MAIN[0] * attache.h, oy = BOIRE_MAIN[1];
+              var hb = [Q[0] + ox * cq - oy * sq, Q[1] + ox * sq + oy * cq, Q[2] - 0.025 * cote, 0, BOIRE_MAIN[2], BOIRE_MAIN[3] + Q[3]];
+              px += (hb[0] - px) * wb; py += (hb[1] - py) * wb; pz += (hb[2] - pz) * wb;
+              rX += (hb[3] - rX) * wb; rY += (hb[4] - rY) * wb; rZ += (hb[5] - rZ) * wb;
+            }
             q.position.set(px, py, pz);
             q.rotation.set(rX, rY, rZ);                                 // ordre ZYX : à plat (x), puis demi-tour autour de l'axe de la main (y), puis orientation des doigts (z)
             m.bout = [px + Math.sin(rZ) * attache.h * 0.8, py - Math.cos(rZ) * attache.h * 0.8, pz];   // le bout des doigts, pour y accrocher le chiffon
@@ -1243,6 +1293,18 @@ var PNJ = (function () {
             }
           }
           if (S.t >= S.duree) etat.service = null;
+        }
+        if (DB) {                                                       // la bouteille qu'il boit : dans sa main, puis elle disparaît
+          var ob2 = DB.objet;
+          if (Q) {
+            var gb = Math.max(0.001, Math.min(1, DB.t * 6 / DB.duree / 0.35, (6 - DB.t * 6 / DB.duree) / 0.45));
+            ob2.visible = true; ob2.position.set(Q[0], Q[1], Q[2]); ob2.rotation.set(0, 0, Q[3]); ob2.scale.set(gb, gb, gb);
+          }
+          if (DB.t >= DB.duree) {
+            groupe.remove(ob2);
+            ob2.traverse(function (m) { if (m.material && m.material.dispose) m.material.dispose(); });
+            etat.boisson = null;
+          }
         }
         // Le verre de vin : en volume lui aussi. Il n'existe que pour un PNJ qui en a tenu un.
         var montrerVin = nomA === 'vin' && w > 0.02 && VV;

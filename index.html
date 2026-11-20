@@ -314,6 +314,7 @@ body {
 </style>
 </head>
 <body>
+<script src="intro.js?v=739dbb0c"></script>   <!-- la page d'entrée (tag, terminal « enter your pseudo »), avant d'entrer dans le bar : voir intro.js -->
 <div id="stage">
   <canvas id="view"></canvas>
   <div class="hud" id="tag"><b>Bodega</b><span>models · v11</span></div>
@@ -404,7 +405,7 @@ body {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="pnj.js?v=c3ad9162"></script>
+<script src="pnj.js?v=200ff4b7"></script>
 <script src="pipi.js?v=e6d0b8b6"></script>
 <script src="modeles.js?v=f30e200d"></script>
 <script src="signal.js?v=40755415"></script>
@@ -3684,6 +3685,7 @@ body {
   window.bodega.siege.rang = function () { return ASSISE.qui ? SIEGES.indexOf(ASSISE.qui) : -1; };   // le siège où le joueur est assis (-1 : debout)
   window.bodega.siege.tele = (function () { for (var i = 0; i < SIEGES.length; i++) if (Math.abs(SIEGES[i].ax - SIEGE.c[0]) < 0.01 && Math.abs(SIEGES[i].az - SIEGE.c[1]) < 0.01) return i; return -1; })();   // la chaise de la télé
   window.bodega.tele.cap = function () { return tele.view ? tele.view.yaw : null; };   // devant la télé : le cap de la vue (sinon null)
+  window.bodega.jet = function () { return window.PIPI ? window.PIPI.creer({ THREE: THREE, scene: scene, camera: camera, colliders: colliders, pitchMax: 1.25, baisser: 0, yeux: EYE }) : null; };   // le jet de pipi d'un autre visiteur : pour l'œil seulement
   requestAnimationFrame(frame);
 })();
 </script>
@@ -4520,7 +4522,7 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
   get selection() { return sel; }, get titre() { const cd = CDS[sel - 1]; return cd ? cdName(cd) : ''; } };   // le CD choisi (0 : aucun) et son nom
 })();
 </script>
-<script src="trace.js?v=4d48dd3f"></script>   <!-- le journal de visite : voir trace.js -->
-<script src="fantomes.js?v=0c568739"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
+<script src="trace.js?v=38524a08"></script>   <!-- le journal de visite : voir trace.js -->
+<script src="fantomes.js?v=86c0a72e"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 </body>
 </html>

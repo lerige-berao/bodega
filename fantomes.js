@@ -23,6 +23,8 @@
      FANTOMES.arrive('a7', { tete: 4, x: 1.2, z: 0.5, a: 0, s: 0 });   // tete : rang dans TETES ; x, z en mètres ; a : cap du visiteur
                                                                        // (radians, celui du joueur : 0 = vers le nord) ; s : 0 debout,
                                                                        // n = assis sur le siège n - 1 de bodega.siege.liste
+     FANTOMES.bouge('a7', { k: 1, h: -0.6 });                          // ce qu'il fait : k = des bits (1 = pipi, 2 = boit une bière), h = la hauteur de son regard
+                                                                       // (radians). On voit alors son jet, là où il vise.
      FANTOMES.bouge('a7', { x: 1.4, z: 0.7, a: 0.3, s: 0 });           // à chaque nouvelle position reçue (cinq par seconde)
      FANTOMES.part('a7');                                              // il s'efface
      FANTOMES.demo(3);  FANTOMES.demo(0);                              // lance, arrête la démonstration
@@ -71,9 +73,10 @@ var FANTOMES = (function () {
     max: coarse ? 12 : 20,          // corps affichés au plus : les plus proches du joueur
     fondu: 0.7,                     // secondes, à l'arrivée et au départ
     retard: 0.25,                   // le fantôme met ce temps à rejoindre la dernière position reçue (elles arrivent 5 fois par seconde)
-    saut: 3                         // au-delà (mètres) il ne court pas à travers le bar : il est déplacé d'un coup
+    saut: 3,                        // au-delà (mètres) il ne court pas à travers le bar : il est déplacé d'un coup
+    jets: 4                         // jets de pipi des autres visibles en même temps, au plus
   };
-  var B = null, tous = {}, horloge = 0, tri = 0, demo = null, voulu = 0, panne = false;
+  var B = null, tous = {}, horloge = 0, tri = 0, demo = null, voulu = 0, panne = false, entrer = false;
 
   function siege(f) { return (f.s > 0 && B.siege && B.siege.liste[f.s - 1]) || null; }
   function nombre(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
@@ -85,6 +88,7 @@ var FANTOMES = (function () {
     var vieux = tous[id];                                               // il revient avant d'avoir fini de s'effacer : on garde son corps
     tous[id] = { id: id, tete: ((Math.round(nombre(e.tete, 0)) % TETES.length) + TETES.length) % TETES.length,
                  x: nombre(e.x, 0), z: nombre(e.z, 0), a: nombre(e.a, 0), s: Math.max(0, Math.round(nombre(e.s, 0))),
+                 k: Math.round(nombre(e.k, 0)) & 255, h: nombre(e.h, 0), jet: vieux ? vieux.jet : null, vise: vieux ? vieux.vise : null,
                  pnj: vieux ? vieux.pnj : null, voile: vieux ? vieux.voile : 0, pose: vieux ? vieux.pose : 0, cap: vieux ? vieux.cap : 0,
                  elu: false, part: false, neuf: true, loin: 0 };
     if (vieux && vieux.tete !== tous[id].tete && vieux.pnj) { vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
@@ -95,6 +99,8 @@ var FANTOMES = (function () {
     var f = tous[id]; if (!f || f.part || !e) return api;
     f.x = nombre(e.x, f.x); f.z = nombre(e.z, f.z); f.a = nombre(e.a, f.a);
     if (e.s !== undefined) f.s = Math.max(0, Math.round(nombre(e.s, 0)));
+    if (e.k !== undefined) f.k = Math.round(nombre(e.k, 0)) & 255;
+    if (e.h !== undefined) f.h = Math.max(-1.57, Math.min(1.57, nombre(e.h, 0)));
     f.neuf = true;
     return api;
   }
@@ -139,6 +145,47 @@ var FANTOMES = (function () {
     n.regarder(regard(f, S));                                            // le PNJ tourne en douceur vers ce regard
     f.neuf = false;
   }
+  // ---- Ce qu'ils font : le pipi ----
+  // Le jet d'un autre visiteur est le même que celui du joueur (pipi.js, fabriqué par la page), pour l'œil seulement. Il part du
+  // fantôme et va où le visiteur regarde. Quatre jets au plus à la fois ; un jet fini est démonté quand sa flaque a séché.
+  var orphelins = [];
+  function jetsVivants() { var n = orphelins.length, id; for (id in tous) if (tous[id].jet) n++; return n; }
+  function arroser(f, dt) {
+    var veut = !!(f.k & 1) && !!f.pnj && !f.part && !f.s && f.voile > 0.5;
+    if (veut && !f.jet && B.jet && jetsVivants() < R.jets) {
+      f.jet = B.jet();
+      if (f.jet) { f.jet.groupe.traverse(function (m) { if (m.isMesh) m.renderOrder += 30; }); f.vise = { x: f.x, z: f.z, yaw: f.a, pitch: f.h }; }   // après les fantômes : devant eux, le jet se voit
+    }
+    if (!f.jet) return;
+    if (!veut && f.jet.repos()) return;                                  // plus rien ne coule ni ne sèche : on n'y touche pas
+    var q = f.pnj ? f.pnj.position() : [f.x, f.z], v = f.vise, k = Math.min(1, dt * 12);
+    v.x = q[0]; v.z = q[1]; v.yaw += Math.atan2(Math.sin(f.a - v.yaw), Math.cos(f.a - v.yaw)) * k; v.pitch += (f.h - v.pitch) * k;
+    if (veut) f.jet.ouvrir(); else if (f.jet.ouvert()) f.jet.fermer();
+    f.jet.maj(dt, v);
+  }
+  function trinquer(f) {                                                // bit 2 : il boit une bière ; on le voit au moment où il s'y met
+    var veut = !!(f.k & 2) && !!f.pnj && !f.part && f.voile > 0.5;
+    if (veut && !f.bu && f.pnj.boire) f.pnj.boire(6.1);                 // le geste du visiteur dure 6 s ; celui du fantôme aussi
+    f.bu = veut;
+  }
+  function lacher(f) {                                                  // le fantôme s'en va : son jet finit de couler tout seul
+    if (!f.jet) return;
+    if (f.jet.ouvert()) f.jet.fermer();
+    orphelins.push({ jet: f.jet, vise: f.vise, age: 0 }); f.jet = null;
+  }
+  function demonter(jet) {
+    var g = jet.groupe; if (g.parent) g.parent.remove(g);
+    g.traverse(function (m) { if (m.geometry && m.geometry.dispose) m.geometry.dispose(); if (m.material) { if (m.material.map && m.material.map.dispose) m.material.map.dispose(); if (m.material.dispose) m.material.dispose(); } });
+  }
+  function finirJets(dt) {
+    for (var i = orphelins.length - 1; i >= 0; i--) {
+      var o = orphelins[i]; o.age += dt;
+      if (o.jet.ouvert()) o.jet.fermer();
+      o.jet.maj(dt, o.vise);
+      if (o.jet.repos() || o.age > 40) { demonter(o.jet); orphelins.splice(i, 1); }
+    }
+  }
+
   function choisir() {                                                  // qui a droit à un corps : les plus proches du joueur
     var v = B.view(), l = [], id, f;
     for (id in tous) { f = tous[id]; f.loin = (f.x - v.x) * (f.x - v.x) + (f.z - v.z) * (f.z - v.z); if (!f.part) l.push(f); }
@@ -155,8 +202,9 @@ var FANTOMES = (function () {
     if (!B) {
       if (!(window.bodega && window.bodega.pnj && window.bodega.view && window.PNJ)) return;
       B = window.bodega;
-      if (voulu) lancerDemo(voulu); else if (RELAIS) connecter(RELAIS);
+      if (voulu) lancerDemo(voulu); else if (RELAIS) entrer = true;
     }
+    if (entrer && !(window.BodegaIntro && window.BodegaIntro.etat === 'facade')) { entrer = false; connecter(RELAIS); }   // il est entré dans le bar
     if (!(dt > 0)) dt = 0;
     horloge += dt;
     if (demo) demo.maj(dt);
@@ -166,14 +214,16 @@ var FANTOMES = (function () {
     for (id in tous) {
       f = tous[id]; cible = (f.part || !f.elu) ? 0 : 1;
       if (!f.pnj && cible && !neuf) { incarner(f); neuf = true; }       // un corps de plus par image, pas davantage : fabriquer ses textures prend quelques millisecondes
+      arroser(f, dt); trinquer(f);
       if (f.pnj) {
         if (!f.part) animer(f);
         f.voile += Math.max(-pas, Math.min(pas, cible - f.voile));
         f.pnj.voile(f.voile);
         if (!cible && f.voile <= 0) { f.pnj.retirer(); f.pnj = null; f.pose = 0; }
       }
-      if (f.part && !f.pnj) delete tous[id];
+      if (f.part && !f.pnj) { lacher(f); delete tous[id]; }
     }
+    finirJets(dt);
   }
 
   // ---- Le relais : les vrais visiteurs ----
@@ -184,9 +234,9 @@ var FANTOMES = (function () {
               dernier: null, envoyes: 0, recus: 0, pause: false, plein: false, veille: 0 };
   function purger() { for (var id in tous) if (id.slice(0, 2) === 'r:') tous[id].part = true; }
   function distants() { var n = 0; for (var id in tous) if (id.slice(0, 2) === 'r:' && !tous[id].part) n++; return n; }
-  function venir(id, tete, nom, x, z, a, s) {
+  function venir(id, tete, nom, x, z, a, s, k, h) {
     if (typeof id !== 'string' || !id || id.length > 12 || id === net.id || distants() >= 40) return;
-    arrive('r:' + id, { tete: nombre(tete, 0), x: nombre(x, 0) / 100, z: nombre(z, 0) / 100, a: nombre(a, 0) * Math.PI / 180, s: nombre(s, 0) });
+    arrive('r:' + id, { tete: nombre(tete, 0), x: nombre(x, 0) / 100, z: nombre(z, 0) / 100, a: nombre(a, 0) * Math.PI / 180, s: nombre(s, 0), k: nombre(k, 0), h: nombre(h, 0) * Math.PI / 180 });
     if (tous['r:' + id]) tous['r:' + id].nom = String(nom || '').slice(0, 24);
   }
   function recevoir(texte) {
@@ -197,9 +247,9 @@ var FANTOMES = (function () {
     if (m.t === 'w') {                                                  // bienvenue : qui l'on est, qui est déjà là
       net.id = String(m.id); net.nom = String(m.nom || ''); net.tete = nombre(m.tete, 0); net.dernier = null; net.envoi = 0;
       purger();
-      (m.les instanceof Array ? m.les : []).slice(0, 40).forEach(function (l) { if (l instanceof Array && l.length >= 7) venir(l[0], l[1], l[2], l[3], l[4], l[5], l[6]); });
-    } else if (m.t === '+') venir(m.id, m.tete, m.nom, m.x, m.z, m.a, m.s);
-    else if (m.t === 'p') { if (typeof m.id === 'string' && tous['r:' + m.id]) bouge('r:' + m.id, { x: nombre(m.x, 0) / 100, z: nombre(m.z, 0) / 100, a: nombre(m.a, 0) * Math.PI / 180, s: nombre(m.s, 0) }); }
+      (m.les instanceof Array ? m.les : []).slice(0, 40).forEach(function (l) { if (l instanceof Array && l.length >= 7) venir(l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8]); });
+    } else if (m.t === '+') venir(m.id, m.tete, m.nom, m.x, m.z, m.a, m.s, m.k, m.h);
+    else if (m.t === 'p') { if (typeof m.id === 'string' && tous['r:' + m.id]) bouge('r:' + m.id, { x: nombre(m.x, 0) / 100, z: nombre(m.z, 0) / 100, a: nombre(m.a, 0) * Math.PI / 180, s: nombre(m.s, 0), k: nombre(m.k, 0), h: nombre(m.h, 0) * Math.PI / 180 }); }
     else if (m.t === '-') { if (typeof m.id === 'string') part('r:' + m.id); }
     else if (m.t === 'plein') net.plein = true;                         // la salle est pleine : on réessaiera plus tard
   }
@@ -236,7 +286,10 @@ var FANTOMES = (function () {
     if (S && B.tele && B.tele.etat && B.tele.etat() !== 'salle' && S.tele >= 0 && S.liste[S.tele]) { s = S.tele + 1; x = S.liste[S.tele].ax; z = S.liste[S.tele].az; }   // devant la télé : sur sa chaise
     else if (S && S.rang) { r = S.rang(); if (r >= 0) s = r + 1; }
     var cap = v.yaw; if (s && S.tele >= 0 && s === S.tele + 1 && B.tele.cap && typeof B.tele.cap() === 'number') cap = B.tele.cap();   // devant la télé : il regarde la télé
-    return { x: Math.round(x * 100), z: Math.round(z * 100), a: ((Math.round(cap * 180 / Math.PI) % 360) + 360) % 360, s: s };
+    var k = (B.pipi && B.pipi.ouvert && B.pipi.ouvert()) ? 1 : 0;                               // ce qu'il fait : 1 = pipi
+    if (B.BOIRE && B.BOIRE.actif) k |= 2;                                                       // 2 = il boit une bière
+    return { x: Math.round(x * 100), z: Math.round(z * 100), a: ((Math.round(cap * 180 / Math.PI) % 360) + 360) % 360, s: s,
+             k: k, h: (k & 1) ? Math.max(-90, Math.min(90, Math.round((v.pitch || 0) * 180 / Math.PI))) : 0 };
   }
   function relayer(dt) {
     if (!net.url) return;
@@ -245,9 +298,9 @@ var FANTOMES = (function () {
     net.envoi -= dt; net.battement -= dt;
     if (net.envoi <= 0) {
       var e = moi(), d = net.dernier, da = d ? Math.abs(((e.a - d.a + 540) % 360) - 180) : 0;
-      // on n'envoie que ce qui change : un pas (2 cm), un regard (3°), un siège
-      if (!d || e.s !== d.s || Math.abs(e.x - d.x) > 2 || Math.abs(e.z - d.z) > 2 || da > 3) {
-        try { net.ws.send(JSON.stringify({ t: 'p', x: e.x, z: e.z, a: e.a, s: e.s })); net.envoyes++; } catch (err) {}
+      // on n'envoie que ce qui change : un pas (2 cm), un regard (3° ; en plein pipi 2°, et aussi sa hauteur), un siège, une action
+      if (!d || e.s !== d.s || e.k !== d.k || Math.abs(e.x - d.x) > 2 || Math.abs(e.z - d.z) > 2 || da > ((e.k & 1) ? 2 : 3) || ((e.k & 1) && Math.abs(e.h - d.h) > 2)) {
+        try { net.ws.send(JSON.stringify(e.k ? { t: 'p', x: e.x, z: e.z, a: e.a, s: e.s, k: e.k, h: e.h } : { t: 'p', x: e.x, z: e.z, a: e.a, s: e.s })); net.envoyes++; } catch (err) {}
         net.dernier = e; net.envoi = 0.2; net.battement = 25;
       }
     }
@@ -379,17 +432,19 @@ var FANTOMES = (function () {
             }
             if (g.etape >= g.route.length) {
               if (g.vise >= 0) { var S = sieges[g.vise]; g.cap = S.cap; g.a = S.cap; g.x = g.place[0]; g.z = g.place[1]; g.s = g.vise + 1; g.mode = 'assis'; g.attente = 6 + alea() * 9; }
-              else { g.mode = 'pause'; g.attente = 1.5 + alea() * 4; }
+              else { g.mode = 'pause'; g.attente = 1.5 + alea() * 4; if (alea() < 0.3) { g.pipi = 2 + alea() * 2.5; g.attente = Math.max(g.attente, g.pipi + 0.8); } else if (alea() < 0.35) { g.biere = 6.2; g.attente = Math.max(g.attente, 6.8); } }
             }
           } else if (g.mode === 'assis') {
             g.attente -= dt; g.a = g.cap + 0.6 * Math.sin(horloge * 0.5 + g.phase);          // assis, il tourne la tête
             if (g.attente <= 0) { delete pris[g.vise]; g.vise = -1; g.s = 0; g.x = g.retour[0]; g.z = g.retour[1]; g.mode = 'pause'; g.attente = 0.8 + alea() * 1.5; }
           } else {
             g.attente -= dt; g.a += 0.5 * Math.sin(horloge * 0.6 + g.phase) * dt;             // debout, il regarde autour de lui
+            if (g.pipi > 0) { g.pipi -= dt; g.k = 1; g.h = -0.62 + 0.12 * Math.sin(horloge * 1.7 + g.phase); g.a += 0.45 * dt; } else { g.k = 0; g.h = 0; }
+            if (g.biere > 0) { g.biere -= dt; g.k |= 2; }                    // ou il boit une bière   // parfois, il fait pipi en tournant un peu
             if (g.attente <= 0) partir(g);
           }
           g.envoi -= dt;
-          if (g.envoi <= 0) { g.envoi += CADENCE; if (g.envoi < 0) g.envoi = 0; bouge(g.id, { x: g.x, z: g.z, a: g.a, s: g.s }); }   // cinq positions par seconde, comme le relais
+          if (g.envoi <= 0) { g.envoi += CADENCE; if (g.envoi < 0) g.envoi = 0; bouge(g.id, { x: g.x, z: g.z, a: g.a, s: g.s, k: g.mode === 'pause' ? g.k || 0 : 0, h: g.h || 0 }); }   // cinq positions par seconde, comme le relais
         });
       },
       finir: function () { gens.forEach(function (g) { part(g.id); }); }
@@ -419,12 +474,13 @@ var FANTOMES = (function () {
       var l = [], id, f, q;
       for (id in tous) {
         f = tous[id]; q = f.pnj ? f.pnj.position() : null;
-        l.push({ id: id, nom: f.nom || null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
+        l.push({ id: id, nom: f.nom || null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
                  px: q ? q[0] : null, pz: q ? q[1] : null, pose: f.pnj ? f.pnj.options.pose : null, marche: f.pnj ? f.pnj.enMarche() : false });
       }
       return l;
     },
-    corps: function (id) { return tous[id] ? tous[id].pnj : null; }
+    corps: function (id) { return tous[id] ? tous[id].pnj : null; },
+    jet: function (id) { return tous[id] ? tous[id].jet : null; }, jetsFinissants: function () { return orphelins.length; }
   };
   return api;
 })();

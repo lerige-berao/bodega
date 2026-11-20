@@ -366,6 +366,12 @@
   }
   function brancherBar() {
     setInterval(tour, 100);
+    // La façade (intro.js) : combien de temps le visiteur reste dehors, et par où il entre
+    var I = window.BodegaIntro;
+    if (I && I.etat !== 'absente') {
+      var pousse = function () { noter('façade', 'entre dans le bar après ' + Math.round(I.duree() / 1000) + ' s dehors' + (I.par ? ' (par ' + (I.par === 'clavier' ? 'le clavier' : I.par === 'dessin' ? 'le dessin' : I.par === 'terminal' ? 'le terminal' : 'le panneau') + ')' : '') + (I.pseudo ? ', pseudo « ' + I.pseudo + ' »' : ''), 'entre dans le bar' + (I.pseudo ? ' (' + I.pseudo + ')' : '')); };
+      if (I.etat === 'entre') pousse(); else window.addEventListener('bodega-entree', pousse);
+    }
     window.addEventListener('keydown', function (e) { if ((e.code === 'KeyE' || e.code === 'Enter') && !e.repeat) parle(); }, true);
     var use = document.getElementById('use');
     if (use) use.addEventListener('click', parle, true);
