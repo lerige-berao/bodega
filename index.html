@@ -2048,8 +2048,9 @@ body {
       o.sansMains = true; o.assis = { avance: 0 };                   // un carton qui tourne sur place, sans s'avancer vers le joueur
       return creerPnj(o);
     }
-    C.a = amoureux({ taille: PNJ_ASSIS });                           // celui de gauche, côté fenêtres
-    C.b = amoureux({ taille: PNJ_ASSIS * 0.95, teinte: 0xe0aa8c });  // celui de droite : un peu plus petit et plus roux, pour qu'on voie bien deux personnes
+    // celui de gauche, côté fenêtres : la fille aux cheveux longs ; celui de droite : le mec à la casquette, un peu plus petit et plus roux
+    C.a = amoureux({ taille: PNJ_ASSIS, tete: 'tete6.png', teteDos: 'tete6-dos.png', cou: 0.38, enfonce: 0.22, grosseur: 1.25 });
+    C.b = amoureux({ taille: PNJ_ASSIS * 0.95, teinte: 0xe0aa8c, tete: 'tete5.png', teteDos: 'tete5-dos.png', cou: 0.40, enfonce: 0, grosseur: 1.05 });
     // Quatre mains à deux faces (le dos côté salle, la paume derrière), faites avec les mêmes images et la même finition que celles des PNJ
     window.PNJ.charger('main.png', function (dos) {
       window.PNJ.charger('paume.png', function (paume) {
@@ -4523,6 +4524,6 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
 })();
 </script>
 <script src="trace.js?v=38524a08"></script>   <!-- le journal de visite : voir trace.js -->
-<script src="fantomes.js?v=86c0a72e"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
+<script src="fantomes.js?v=2d5c032c"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 </body>
 </html>

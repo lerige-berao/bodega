@@ -20,7 +20,7 @@
    démonstration), siege.rang() le siège où le joueur est assis, siege.tele celui de la télé, tele.etat(). Elle appelle
    FANTOMES.maj(dt) à chaque image.
 
-     FANTOMES.arrive('a7', { tete: 4, x: 1.2, z: 0.5, a: 0, s: 0 });   // tete : rang dans TETES ; x, z en mètres ; a : cap du visiteur
+     FANTOMES.arrive('a7', { tete: 4, x: 1.2, z: 0.5, a: 0, s: 0, nom: 'leo' });   // tete : rang dans TETES ; x, z en mètres ; a : cap du visiteur ; nom : écrit au-dessus de sa tête
                                                                        // (radians, celui du joueur : 0 = vers le nord) ; s : 0 debout,
                                                                        // n = assis sur le siège n - 1 de bodega.siege.liste
      FANTOMES.bouge('a7', { k: 1, h: -0.6 });                          // ce qu'il fait : k = des bits (1 = pipi, 2 = boit une bière), h = la hauteur de son regard
@@ -89,11 +89,18 @@ var FANTOMES = (function () {
     tous[id] = { id: id, tete: ((Math.round(nombre(e.tete, 0)) % TETES.length) + TETES.length) % TETES.length,
                  x: nombre(e.x, 0), z: nombre(e.z, 0), a: nombre(e.a, 0), s: Math.max(0, Math.round(nombre(e.s, 0))),
                  k: Math.round(nombre(e.k, 0)) & 255, h: nombre(e.h, 0), jet: vieux ? vieux.jet : null, vise: vieux ? vieux.vise : null,
+                 nom: propre(e.nom) || (vieux ? vieux.nom : ''), etiq: vieux ? vieux.etiq : null,
                  pnj: vieux ? vieux.pnj : null, voile: vieux ? vieux.voile : 0, pose: vieux ? vieux.pose : 0, cap: vieux ? vieux.cap : 0,
                  elu: false, part: false, neuf: true, loin: 0 };
-    if (vieux && vieux.tete !== tous[id].tete && vieux.pnj) { vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
+    if (vieux && vieux.tete !== tous[id].tete && vieux.pnj) { oterEtiquette(tous[id]); vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
     tri = 0;
     return api;
+  }
+  // un pseudo affichable : sans caractères de contrôle, invisibles ou de sens d'écriture, 20 caractères au plus ('' sinon)
+  function propre(v) {
+    if (typeof v !== 'string') return '';
+    var n = (v.normalize ? v.normalize('NFC') : v).replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+    return Array.from(n).slice(0, 20).join('').trim();
   }
   function bouge(id, e) {
     var f = tous[id]; if (!f || f.part || !e) return api;
@@ -101,6 +108,7 @@ var FANTOMES = (function () {
     if (e.s !== undefined) f.s = Math.max(0, Math.round(nombre(e.s, 0)));
     if (e.k !== undefined) f.k = Math.round(nombre(e.k, 0)) & 255;
     if (e.h !== undefined) f.h = Math.max(-1.57, Math.min(1.57, nombre(e.h, 0)));
+    if (e.nom !== undefined && propre(e.nom)) f.nom = propre(e.nom);
     f.neuf = true;
     return api;
   }
@@ -168,6 +176,42 @@ var FANTOMES = (function () {
     if (veut && !f.bu && f.pnj.boire) f.pnj.boire(6.1);                 // le geste du visiteur dure 6 s ; celui du fantôme aussi
     f.bu = veut;
   }
+  var ETIQ = { haut: 0.07, marge: 0.07, police: 13, opacite: 0.95 };   // hauteur de l'étiquette (m), écart au-dessus de la tête (m), taille du texte (px)
+  function texteEtiquette(nom) {                                        // le pseudo, en pixels nets, blanc cassé sur un bandeau sombre
+    var c = document.createElement('canvas'), g = c.getContext('2d'), P = ETIQ.police, font = 'bold ' + P + 'px "Courier New", Courier, monospace';
+    g.font = font;
+    var l = Math.ceil(g.measureText(nom).width) + 8, h = P + 5;
+    c.width = l; c.height = h; g = c.getContext('2d'); g.font = font;
+    g.fillStyle = 'rgba(20, 17, 13, 0.58)'; g.fillRect(0, 0, l, h);
+    g.fillStyle = '#f4ead2'; g.textBaseline = 'middle'; g.textAlign = 'center'; g.fillText(nom, l / 2, h / 2 + 0.5);
+    var t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    return { tex: t, l: l, h: h };
+  }
+  function etiqueter(f) {
+    var p = f.pnj;
+    if (!p || !f.nom || !p.groupe || !p.morceaux || !window.THREE) { oterEtiquette(f); return; }
+    var E = f.etiq;
+    if (E && (E.nom !== f.nom || E.pnj !== p)) { oterEtiquette(f); E = null; }
+    if (!E) {
+      var t = texteEtiquette(f.nom);
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: t.tex, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+      m.scale.set(ETIQ.haut * t.l / t.h, ETIQ.haut, 1); m.renderOrder = 19.9;   // après les fantômes, avant la main de la télé
+      p.groupe.add(m);
+      E = f.etiq = { nom: f.nom, pnj: p, m: m, tex: t.tex };
+    }
+    var te = p.morceaux.tete, v = B.view(), gp = p.groupe.position;
+    var haut = te.visible ? p.corps.position.y + te.position.y + te.scale.y : 1.9;   // le haut de sa tête
+    E.m.position.set(0, haut + ETIQ.marge + ETIQ.haut / 2, 0);
+    E.m.rotation.y = Math.atan2(v.x - gp.x, v.z - gp.z) - p.groupe.rotation.y;     // tournée vers le joueur
+    E.m.material.opacity = ETIQ.opacite * Math.max(0, Math.min(1, f.voile));
+    E.m.visible = te.visible && f.voile > 0.02;
+  }
+  function oterEtiquette(f) {
+    var E = f && f.etiq; if (!E) return;
+    if (E.m.parent) E.m.parent.remove(E.m);
+    try { E.tex.dispose(); E.m.material.dispose(); E.m.geometry.dispose(); } catch (e) {}
+    f.etiq = null;
+  }
   function lacher(f) {                                                  // le fantôme s'en va : son jet finit de couler tout seul
     if (!f.jet) return;
     if (f.jet.ouvert()) f.jet.fermer();
@@ -219,7 +263,8 @@ var FANTOMES = (function () {
         if (!f.part) animer(f);
         f.voile += Math.max(-pas, Math.min(pas, cible - f.voile));
         f.pnj.voile(f.voile);
-        if (!cible && f.voile <= 0) { f.pnj.retirer(); f.pnj = null; f.pose = 0; }
+        etiqueter(f);
+        if (!cible && f.voile <= 0) { oterEtiquette(f); f.pnj.retirer(); f.pnj = null; f.pose = 0; }
       }
       if (f.part && !f.pnj) { lacher(f); delete tous[id]; }
     }
@@ -237,7 +282,12 @@ var FANTOMES = (function () {
   function venir(id, tete, nom, x, z, a, s, k, h) {
     if (typeof id !== 'string' || !id || id.length > 12 || id === net.id || distants() >= 40) return;
     arrive('r:' + id, { tete: nombre(tete, 0), x: nombre(x, 0) / 100, z: nombre(z, 0) / 100, a: nombre(a, 0) * Math.PI / 180, s: nombre(s, 0), k: nombre(k, 0), h: nombre(h, 0) * Math.PI / 180 });
-    if (tous['r:' + id]) tous['r:' + id].nom = String(nom || '').slice(0, 24);
+    if (tous['r:' + id]) tous['r:' + id].nom = propre(nom);
+  }
+  function monPseudo() {                                                 // celui tapé à l'entrée, sinon le dernier gardé dans ce navigateur
+    var I = window.BodegaIntro, p = I && I.pseudo ? I.pseudo : '';
+    if (!p) { try { p = localStorage.getItem('berao-pseudo') || ''; } catch (e) { p = ''; } }
+    return propre(p);
   }
   function recevoir(texte) {
     if (typeof texte !== 'string' || texte === 'pong' || texte.length > 8000) return;
@@ -248,8 +298,11 @@ var FANTOMES = (function () {
       net.id = String(m.id); net.nom = String(m.nom || ''); net.tete = nombre(m.tete, 0); net.dernier = null; net.envoi = 0;
       purger();
       (m.les instanceof Array ? m.les : []).slice(0, 40).forEach(function (l) { if (l instanceof Array && l.length >= 7) venir(l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8]); });
+      var ps = monPseudo();                                             // le pseudo tapé à l'entrée : il remplace « Guest n » chez les autres
+      if (ps && net.ws) { try { net.ws.send(JSON.stringify({ t: 'n', nom: ps })); net.nom = ps; } catch (e) {} }
     } else if (m.t === '+') venir(m.id, m.tete, m.nom, m.x, m.z, m.a, m.s, m.k, m.h);
     else if (m.t === 'p') { if (typeof m.id === 'string' && tous['r:' + m.id]) bouge('r:' + m.id, { x: nombre(m.x, 0) / 100, z: nombre(m.z, 0) / 100, a: nombre(m.a, 0) * Math.PI / 180, s: nombre(m.s, 0), k: nombre(m.k, 0), h: nombre(m.h, 0) * Math.PI / 180 }); }
+    else if (m.t === 'n') { if (typeof m.id === 'string' && tous['r:' + m.id] && propre(m.nom)) tous['r:' + m.id].nom = propre(m.nom); }   // il donne son pseudo
     else if (m.t === '-') { if (typeof m.id === 'string') part('r:' + m.id); }
     else if (m.t === 'plein') net.plein = true;                         // la salle est pleine : on réessaiera plus tard
   }
@@ -401,7 +454,7 @@ var FANTOMES = (function () {
       var p = caseAuHasard(), essais = 0;
       while (essais++ < 40 && ((p[0] - v0.x) * (p[0] - v0.x) + (p[1] - v0.z) * (p[1] - v0.z) < 1.4 || gens.some(function (g) { return (g.x - p[0]) * (g.x - p[0]) + (g.z - p[1]) * (g.z - p[1]) < 0.6; }))) p = caseAuHasard();
       var g = { id: 'demo' + (k + 1), x: p[0], z: p[1], a: alea() * 6.283, s: 0, mode: 'pause', attente: 0.5 + alea() * 3, route: null, etape: 0, vise: -1, retour: null, cap: 0, phase: alea() * 6.283, envoi: alea() * CADENCE };
-      gens.push(g); arrive(g.id, { tete: tetes[k % tetes.length], x: g.x, z: g.z, a: g.a, s: 0 });
+      gens.push(g); arrive(g.id, { tete: tetes[k % tetes.length], x: g.x, z: g.z, a: g.a, s: 0, nom: 'Guest ' + (1 + Math.floor(alea() * 99)) });
     }
     function partir(g) {                                                // où va-t-il ? Une fois sur trois vers un siège libre, sinon ailleurs dans le bar
       var libres = [], i, r, but, q;
@@ -474,7 +527,7 @@ var FANTOMES = (function () {
       var l = [], id, f, q;
       for (id in tous) {
         f = tous[id]; q = f.pnj ? f.pnj.position() : null;
-        l.push({ id: id, nom: f.nom || null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
+        l.push({ id: id, nom: f.nom || null, etiquette: f.etiq ? { nom: f.etiq.nom, visible: f.etiq.m.visible, y: f.etiq.m.position.y, opacite: f.etiq.m.material.opacity } : null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
                  px: q ? q[0] : null, pz: q ? q[1] : null, pose: f.pnj ? f.pnj.options.pose : null, marche: f.pnj ? f.pnj.enMarche() : false });
       }
       return l;
