@@ -24,6 +24,9 @@
    Une tête dessinée avec de longs cheveux : on la grossit pour que le visage garde sa taille, et on l'enfonce pour que le
    menton arrive au col, les cheveux tombant devant le t-shirt. cou règle où le cou tombe sous l'image.
      PNJ.creer({ ..., tete: 'tete9.png', grosseur: 1.45, enfonce: 0.33, cou: 0.48 });
+   Un hoodie : capuche = la part de son image au-dessus des épaules. Elle monte derrière la tête, les épaules restent
+   à la hauteur de celles d'un t-shirt.
+     pnj.habiller({ tshirt: 'pnj-hoodie-berao.png' }); pnj.regler({ capuche: 0.25 });
 
    Boire une bière au goulot (un geste de 6 s ; une bouteille apparaît dans sa main, puis disparaît) :
      leo.boire(6); leo.boit();                                // boit() : le geste en cours ({ t, duree }) ou null
@@ -149,6 +152,7 @@ var PNJ = (function () {
     cou: 0.5,              // où est le cou sous l'image de la tête, en part de sa largeur : 0.5 = au milieu ; à régler pour une tête
                            // qui dépasse d'un côté (un long museau). De dos, l'image est supposée en miroir : le cou passe à 1 - cou.
     enfonce: 0,            // de combien la tête descend dans le col, en hauteurs de tête : 0.17 = là où un bonnet la met
+    capuche: 0,            // part de l'image du haut qui dépasse au-dessus des épaules (capuche d'un hoodie) : elle monte derrière la tête
     grosseur: 1,           // taille de la tête seule, sans toucher à l'échelle du corps : 1.3 pour une tête dont les cheveux prennent de la place
     fantome: 0,            // 0 = PNJ ordinaire ; entre 0 et 1 = fantôme, à cette opacité (0.4 = 60 % transparent). Fixé à la création.
     portee: 1.6,           // distance, en mètres, en dessous de laquelle le joueur peut lui parler
@@ -309,6 +313,12 @@ var PNJ = (function () {
     }
     mesurer('tete', p.tete * Math.max(0.2, o.grosseur)); mesurer('tshirt', p.tshirt); mesurer('pantalon', p.pantalon);   // la tête grossit seule : le corps garde son échelle
     mesurer('chaussure', p.chaussure); mesurer('semelle', A.semelle);
+    // Une capuche : le haut de l'image dépasse au-dessus du torse, derrière la tête ; les épaules restent où sont celles d'un t-shirt.
+    var cap = Math.max(0, Math.min(0.6, o.capuche || 0)), hautCap = 0;
+    if (cap && calques.tshirt) {
+      hautCap = Math.round(H.tshirt * cap / (1 - cap));
+      L.tshirt = Math.max(2, Math.round((H.tshirt + hautCap) * calques.tshirt.w / calques.tshirt.h));
+    }
     // Accessoires : la boîte de chaque coiffe par rapport à la tête, et la ceinture par rapport au pantalon
     var AC = o.accessoires, coiffes = [], monte = 0, lCoiffe = 0, ceint = null;
     COIFFES.forEach(function (nom) {
@@ -383,7 +393,10 @@ var PNJ = (function () {
       g.drawImage(s, 0, 0, Math.max(1, s.width * (part || 1)), s.height, Math.round(x), Math.round(y), l, h);
     }
     function peindreTorse(g) {
-      poser(g, 'tshirt', cx);
+      if (hautCap) {
+        var s = reduire(calques.tshirt.c, L.tshirt);
+        g.drawImage(s, Math.round(cx - L.tshirt / 2), Y.tshirt - hautCap, L.tshirt, H.tshirt + hautCap);
+      } else poser(g, 'tshirt', cx);
       if (ceint) etirer(g, ceint.c, cx - ceint.l / 2, ourletY - ceint.h, ceint.l, ceint.h, unie ? 0.16 : 1);   // sur le bas du t-shirt, pile là où passe la taille du pantalon
     }
     function peindreTete(g) {
@@ -403,9 +416,10 @@ var PNJ = (function () {
     var hautBas = assis ? Math.min(ourletY, Y.semelle - marge) : Y.pantalon;
     var parties = {
       bas: morceau(assis ? Math.max(L.pantalon, 2 * (pied + marge) + L.semelle) : Math.max(L.pantalon, 2 * pied + L.chaussure), hautBas, bas, peindreBas),
-      torse: morceau(Math.max(L.tshirt, ceint ? ceint.l : 0), Y.tshirt, ourletY, peindreTorse),
+      torse: morceau(Math.max(L.tshirt, ceint ? ceint.l : 0), Y.tshirt - hautCap, ourletY, peindreTorse),
       tete: morceau(Math.max(lTete, lCoiffe), 0, Y.tete + H.tete, peindreTete)
     };
+    parties.torse.corps = H.tshirt / o.grain;                         // le torse sans la capuche : ce qui compte pour les mains et la bouche
     if (perche) {                                                       // sur un tabouret : le pantalon coupé en deux, là où il se plie
       var pli = Math.min(bas - 2, Math.max(ourletY + 2, Y.pantalon + Math.round(H.pantalon * o.tabouret.coupe)));
       parties.cuisses = morceau(L.pantalon, ourletY, pli, function (g) { poser(g, 'pantalon', cx); });   // de l'ourlet du t-shirt aux genoux
@@ -434,7 +448,7 @@ var PNJ = (function () {
       g.drawImage(a.c, Math.round((l - a.c.width) / 2), h - a.c.height);
       if (b) g.drawImage(b, l + Math.round((l - b.width) / 2), h - b.height);
       else { g.save(); g.translate(2 * l - Math.round((l - a.c.width) / 2), h - a.c.height); g.scale(-1, 1); g.drawImage(a.c, 0, 0); g.restore(); }
-      P[nom] = { c: c, l: l / grain, h: h / grain, y: a.y };
+      P[nom] = { c: c, l: l / grain, h: h / grain, y: a.y, corps: a.corps };
     });
     return { parties: P, c: f.c, l: f.l, h: f.h, part: f.part, ourlet: f.ourlet, demiTshirt: f.demiTshirt };
   }
@@ -856,7 +870,7 @@ var PNJ = (function () {
             j.cuisse.visible = j.bas.visible = !!pc;
             if (pc) { j.cuisse.scale.set(pc.l / 2, pc.h, 1); j.bas.scale.set(pb.l / 2, pb.h, 1); }
           });
-          repos = { hTete: r.parties.tete.h, bas: pb.y, torse: r.parties.torse.y, cou: r.parties.tete.y - r.parties.torse.y, ourlet: r.ourlet, demi: r.demiTshirt, hTorse: r.parties.torse.h,
+          repos = { hTete: r.parties.tete.h, bas: pb.y, torse: r.parties.torse.y, cou: r.parties.tete.y - r.parties.torse.y, ourlet: r.ourlet, demi: r.demiTshirt, hTorse: r.parties.torse.corps || r.parties.torse.h,
                     cuisse: pc ? pc.h : 0, jean: pc ? pc.l : 0, jambe: pb.h, pieds: pb.l };
           // assis : le bas du corps est posé au bord de l'assise ; sur un tabouret : l'ourlet du t-shirt (le pli des hanches) est juste au-dessus
           etat.socle = o.pose === 'assis' ? o.siege - o.assis.descend : o.pose === 'tabouret' ? o.siege + o.tabouret.monte - r.ourlet : 0;

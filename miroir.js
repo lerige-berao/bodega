@@ -18,7 +18,7 @@
   var coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   var B = null, M = null, T = null, rt = null, cam = null, glace = null, matGrise = null, matReflet = null;
   var C = null;                                            // la glace : centre, normale (vers la salle), repère vr / vu, coins, taille
-  var moi = null, teteMoi = -1, buvait = false, panne = false, image = 0, actif = false, rendus = 0;
+  var moi = null, teteMoi = -1, tenueMoi = '', buvait = false, panne = false, image = 0, actif = false, rendus = 0;
 
   function v3(x, y, z) { return [x, y, z]; }
   function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -56,7 +56,7 @@
     mesurer();
   }
 
-  // Le corps du joueur : un PNJ (tenue commune, sa tête), sur le calque 1. Refait si sa tête change (connexion au relais).
+  // Le corps du joueur : un PNJ (sa tenue, sa tête), sur le calque 1. Refait si sa tête ou sa tenue change (connexion au relais).
   function maTete() {
     var F = window.FANTOMES, r = F && F.reseau ? F.reseau() : null, n = F && F.tetes ? F.tetes.length : 28, t;
     if (r && r.id && typeof r.tete === 'number') return ((r.tete % n) + n) % n;
@@ -65,13 +65,15 @@
     return t;
   }
   function corps(x, z, cap) {
-    var t = maTete(), TT = window.FANTOMES && window.FANTOMES.tetes;
-    if (moi && t === teteMoi) return moi;
+    var F = window.FANTOMES, t = maTete(), TT = F && F.tetes, tn = F && F.maTenue ? F.maTenue() : '';   // sa tête et sa tenue : celles des autres écrans
+    if (moi && t === teteMoi && tn === tenueMoi) return moi;
     if (moi) { moi.retirer(); moi = null; }
     if (!TT || !TT[t]) return null;
     var q = TT[t];
-    moi = B.pnj({ pos: [x, z], face: cap, solide: false, portee: 0, tete: q[0] + '.png', teteDos: q[0] + '-dos.png', cou: q[1], enfonce: q[2], grosseur: q[3] });
-    teteMoi = t; buvait = false;
+    var o = { pos: [x, z], face: cap, solide: false, portee: 0, tete: q[0] + '.png', teteDos: q[0] + '-dos.png', cou: q[1], enfonce: q[2], grosseur: q[3] };
+    if (tn && F.habits) { var v = F.habits(tn, t), k; for (k in v) o[k] = v[k]; }
+    moi = B.pnj(o);
+    teteMoi = t; tenueMoi = tn; buvait = false;
     return moi;
   }
   function auCalque1(o) { o.traverse(function (m) { if (m.layers) m.layers.set(1); }); }
@@ -150,7 +152,7 @@
     maj: maj,
     reglages: R,
     // pour les essais
-    etat: function () { return { actif: actif, panne: panne, rendus: rendus, tete: teteMoi, corps: !!moi, visible: !!(moi && moi.groupe.visible), reflet: !!glace && glace.material === matReflet }; },
+    etat: function () { return { actif: actif, panne: panne, rendus: rendus, tete: teteMoi, tenue: tenueMoi, corps: !!moi, visible: !!(moi && moi.groupe.visible), reflet: !!glace && glace.material === matReflet }; },
     corps: function () { return moi; },
     camera: function () { return cam; }
   };

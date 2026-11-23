@@ -65,6 +65,57 @@ var FANTOMES = (function () {
     ['tete29', 0.55, 0, 1.1],       // écailles au stylo violet
     ['tete30', 0.5, 0, 1.15]        // tigre qui rugit
   ];
+  // Les tenues : un haut, un bas, une coiffe (ou rien), tirés au hasard à la première visite. [face, dos, capuche, mains]
+  // capuche : la part haute de l'image qui monte derrière la tête ; mains : où elles flottent (1 = comme avec un t-shirt).
+  var TENUES = {
+    hauts: [
+      ['tshirt', 'tshirt-dos'],                                     // le tee peint d'origine
+      ['pnj-croptop-bleu', 'pnj-croptop-bleu-dos'],
+      ['pnj-tshirt-rige2000', 'pnj-tshirt-rige2000-dos'],
+      ['pnj-tshirt-ratboxe', 'pnj-tshirt-ratboxe-dos'],
+      ['pnj-tshirt-embleme', 'pnj-tshirt-embleme-dos'],
+      ['pnj-hoodie-berao', 'pnj-hoodie-berao-dos', 0.25, 0.68],
+      ['pnj-tshirt-carapace', 'pnj-tshirt-carapace-dos'],
+      ['pnj-tshirt-chat', 'pnj-tshirt-chat-dos'],
+      ['pnj-polo-squelette', 'pnj-polo-squelette-dos']
+    ],
+    bas: [['pantalon', 'pantalon-dos'], ['pnj-short-noir', 'pnj-short-noir-dos']],
+    coiffes: [null, ['pnj-casquette-trucker', 'pnj-casquette-trucker-dos', { largeur: 0.8, hauteur: 0.5, front: 0.34 }]],   // sa boîte sur la tête : au-dessus des yeux
+    chance: { short: 0.4, coiffe: 0.3 },
+    // les têtes qui peuvent porter une casquette (pas de cornes, de capuche, de voile, de casquette déjà dessinée...)
+    casquables: ['tete3', 'tete4', 'tete6', 'tete8', 'tete9', 'tete10', 'tete11', 'tete12', 'tete13', 'tete18', 'tete24', 'tete25', 'tete28']
+  };
+  function lireTenue(v) {                                               // "h.b.c" ramené aux listes, ou null
+    var m = typeof v === 'string' && /^(\d{1,2})\.(\d{1,2})\.(\d{1,2})$/.exec(v);
+    if (!m) return null;
+    return (+m[1] % TENUES.hauts.length) + '.' + (+m[2] % TENUES.bas.length) + '.' + (+m[3] % TENUES.coiffes.length);
+  }
+  function tirerTenue(alea) {
+    alea = alea || Math.random;
+    return Math.floor(alea() * TENUES.hauts.length) + '.' + (alea() < TENUES.chance.short ? 1 : 0) + '.' +
+           (alea() < TENUES.chance.coiffe ? 1 + Math.floor(alea() * (TENUES.coiffes.length - 1)) : 0);
+  }
+  function tenueDe(tete) {                                              // sans tenue annoncée (un relais d'avant) : déduite de la tête
+    var n = ((Math.round(nombre(tete, 0)) % 997) + 997) % 997, x = (n * 2654435761) >>> 0, i = 0;
+    return tirerTenue(function () { x = (x ^ (x >>> 15)) * 2246822519 >>> 0; x = (x + 0x9e3779b9 + 31 * i++) >>> 0; return x / 4294967296; });
+  }
+  function tenueLocale() {                                              // la sienne, gardée dans ce navigateur (tirée la première fois)
+    var t = null;
+    try { t = lireTenue(localStorage.getItem('berao-tenue')); } catch (e) { t = null; }
+    if (!t) { t = tirerTenue(); try { localStorage.setItem('berao-tenue', t); } catch (e) {} }
+    return t;
+  }
+  // Les calques d'une tenue, à passer à bodega.pnj avec la tête. La coiffe ne va que sur une tête qui peut la porter.
+  function habits(code, tete) {
+    var c = (lireTenue(code) || '0.0.0').split('.'), h = TENUES.hauts[+c[0]], b = TENUES.bas[+c[1]], k = TENUES.coiffes[+c[2]];
+    var nom = typeof tete === 'number' ? (TETES[tete] || [''])[0] : String(tete || '');
+    var o = { tshirt: h[0] + '.png', tshirtDos: h[1] + '.png', capuche: h[2] || 0, mainsEcart: h[3] || 0,
+              pantalon: b[0] + '.png', pantalonDos: b[1] + '.png' };
+    if (k && TENUES.casquables.indexOf(nom) >= 0) { o.casquette = k[0] + '.png'; o.casquetteDos = k[1] + '.png'; if (k[2]) o.accessoires = { casquette: k[2] }; }
+    return o;
+  }
+  function vetir(o, code, tete) { var v = habits(code, tete), k; for (k in v) o[k] = v[k]; return o; }
+
   var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   var RELAIS = 'wss://berao-salon.berao.workers.dev';   // l'adresse du relais (wss://berao-salon.….workers.dev) ; vide : la page ne se connecte à rien
   var R = {
@@ -86,13 +137,14 @@ var FANTOMES = (function () {
     e = e || {};
     if (tous[id] && !tous[id].part) return bouge(id, e);
     var vieux = tous[id];                                               // il revient avant d'avoir fini de s'effacer : on garde son corps
-    tous[id] = { id: id, tete: ((Math.round(nombre(e.tete, 0)) % TETES.length) + TETES.length) % TETES.length,
+    var tt = ((Math.round(nombre(e.tete, 0)) % TETES.length) + TETES.length) % TETES.length;
+    tous[id] = { id: id, tete: tt, tenue: lireTenue(e.tenue) || tenueDe(tt),
                  x: nombre(e.x, 0), z: nombre(e.z, 0), a: nombre(e.a, 0), s: Math.max(0, Math.round(nombre(e.s, 0))),
                  k: Math.round(nombre(e.k, 0)) & 255, h: nombre(e.h, 0), jet: vieux ? vieux.jet : null, vise: vieux ? vieux.vise : null,
                  nom: propre(e.nom) || (vieux ? vieux.nom : ''), etiq: vieux ? vieux.etiq : null,
                  pnj: vieux ? vieux.pnj : null, voile: vieux ? vieux.voile : 0, pose: vieux ? vieux.pose : 0, cap: vieux ? vieux.cap : 0,
                  elu: false, part: false, neuf: true, loin: 0 };
-    if (vieux && vieux.tete !== tous[id].tete && vieux.pnj) { oterEtiquette(tous[id]); oterBulle(vieux); vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
+    if (vieux && (vieux.tete !== tous[id].tete || vieux.tenue !== tous[id].tenue) && vieux.pnj) { oterEtiquette(tous[id]); oterBulle(vieux); vieux.pnj.retirer(); tous[id].pnj = null; tous[id].voile = 0; tous[id].pose = 0; }
     tri = 0;
     return api;
   }
@@ -118,8 +170,8 @@ var FANTOMES = (function () {
   // ---- Leur corps ----
   function incarner(f) {
     var t = TETES[f.tete];
-    f.pnj = B.pnj({ pos: [f.x, f.z], regard: f.a + Math.PI, face: 'regard', regardLibre: true, fantome: R.opacite, solide: false, portee: 0,
-                    tete: t[0] + '.png', teteDos: t[0] + '-dos.png', cou: t[1], enfonce: t[2], grosseur: t[3] });
+    f.pnj = B.pnj(vetir({ pos: [f.x, f.z], regard: f.a + Math.PI, face: 'regard', regardLibre: true, fantome: R.opacite, solide: false, portee: 0,
+                          tete: t[0] + '.png', teteDos: t[0] + '-dos.png', cou: t[1], enfonce: t[2], grosseur: t[3] }, f.tenue, f.tete));
     f.pnj.voile(f.voile); f.pose = 0;
     if (siege(f)) poser(f, siege(f));
   }
@@ -319,15 +371,15 @@ var FANTOMES = (function () {
   // Ce qui s'échange est décrit dans salon/src/bar.js. Tout ce qui arrive du relais est traité comme une donnée douteuse :
   // des nombres vérifiés, un nombre de fantômes plafonné, rien d'autre que des positions.
   var DELAIS = [1, 2, 5, 10, 30, 60, 60, 60, 300];                      // secondes avant de réessayer, d'échec en échec
-  var net = { url: '', ws: null, etat: 'ferme', id: null, nom: null, tete: null, essais: 0, attente: 0, envoi: 0, battement: 0,
+  var net = { url: '', ws: null, etat: 'ferme', id: null, nom: null, tete: null, tenue: null, essais: 0, attente: 0, envoi: 0, battement: 0,
               dernier: null, envoyes: 0, recus: 0, pause: false, plein: false, veille: 0, chat: true, expulse: false };
   var ecouteurs = [], muets = {};                                       // le chat : qui écoute (chat.js), qui est masqué (sur cette page seulement)
   function prevenir(m) { for (var i = 0; i < ecouteurs.length; i++) { try { ecouteurs[i](m); } catch (e) {} } }
   function purger() { for (var id in tous) if (id.slice(0, 2) === 'r:') tous[id].part = true; }
   function distants() { var n = 0; for (var id in tous) if (id.slice(0, 2) === 'r:' && !tous[id].part) n++; return n; }
-  function venir(id, tete, nom, x, z, a, s, k, h) {
+  function venir(id, tete, nom, x, z, a, s, k, h, tenue) {
     if (typeof id !== 'string' || !id || id.length > 12 || id === net.id || distants() >= 40) return;
-    arrive('r:' + id, { tete: nombre(tete, 0), x: nombre(x, 0) / 100, z: nombre(z, 0) / 100, a: nombre(a, 0) * Math.PI / 180, s: nombre(s, 0), k: nombre(k, 0), h: nombre(h, 0) * Math.PI / 180 });
+    arrive('r:' + id, { tete: nombre(tete, 0), tenue: tenue, x: nombre(x, 0) / 100, z: nombre(z, 0) / 100, a: nombre(a, 0) * Math.PI / 180, s: nombre(s, 0), k: nombre(k, 0), h: nombre(h, 0) * Math.PI / 180 });
     if (tous['r:' + id]) tous['r:' + id].nom = propre(nom);
   }
   function propre140(v) {                                               // un message du chat affichable (140 caractères au plus)
@@ -356,12 +408,15 @@ var FANTOMES = (function () {
     if (!m || typeof m !== 'object') return;
     net.recus++;
     if (m.t === 'w') {                                                  // bienvenue : qui l'on est, qui est déjà là
-      net.id = String(m.id); net.nom = String(m.nom || ''); net.chat = m.chat !== false; net.tete = nombre(m.tete, 0); net.dernier = null; net.envoi = 0;
+      net.id = String(m.id); net.nom = String(m.nom || ''); net.chat = m.chat !== false; net.tete = nombre(m.tete, 0);
+      try { localStorage.setItem('berao-tete', String(net.tete)); } catch (e) {}
+      net.tenue = lireTenue(m.tenue) || tenueDe(net.tete);              // un relais d'avant ne la renvoie pas : les autres la déduisent de la tête
+      if (lireTenue(m.tenue)) { try { localStorage.setItem('berao-tenue', net.tenue); } catch (e) {} }   // sa tête : il la retrouvera en revenant net.dernier = null; net.envoi = 0;
       purger();
-      (m.les instanceof Array ? m.les : []).slice(0, 40).forEach(function (l) { if (l instanceof Array && l.length >= 7) venir(l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8]); });
+      (m.les instanceof Array ? m.les : []).slice(0, 40).forEach(function (l) { if (l instanceof Array && l.length >= 7) venir(l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8], l[9]); });
       var ps = monPseudo();                                             // le pseudo tapé à l'entrée : il remplace « Guest n » chez les autres
       if (ps && net.ws) { try { net.ws.send(JSON.stringify({ t: 'n', nom: ps })); net.nom = ps; } catch (e) {} }
-    } else if (m.t === '+') venir(m.id, m.tete, m.nom, m.x, m.z, m.a, m.s, m.k, m.h);
+    } else if (m.t === '+') venir(m.id, m.tete, m.nom, m.x, m.z, m.a, m.s, m.k, m.h, m.tenue);
     else if (m.t === 'p') { if (typeof m.id === 'string' && tous['r:' + m.id]) bouge('r:' + m.id, { x: nombre(m.x, 0) / 100, z: nombre(m.z, 0) / 100, a: nombre(m.a, 0) * Math.PI / 180, s: nombre(m.s, 0), k: nombre(m.k, 0), h: nombre(m.h, 0) * Math.PI / 180 }); }
     else if (m.t === 'n') { if (typeof m.id === 'string' && tous['r:' + m.id] && propre(m.nom)) tous['r:' + m.id].nom = propre(m.nom); }   // il donne son pseudo
     else if (m.t === '-') { if (typeof m.id === 'string') part('r:' + m.id); }
@@ -378,14 +433,35 @@ var FANTOMES = (function () {
     else if (m.t === 'expulse') { net.expulse = true; prevenir({ t: 'expulse' }); deconnecter(); }   // expulsé : on ne revient pas tout seul
     else if (m.t === 'plein') net.plein = true;                         // la salle est pleine : on réessaiera plus tard
   }
+  var jetonPage = '';
+  function jeton() {                                                    // 16 lettres ou chiffres tirés au hasard
+    var a = 'abcdefghijklmnopqrstuvwxyz0123456789', s = '', i, n = new Uint8Array(16);
+    try { crypto.getRandomValues(n); } catch (e) { for (i = 0; i < 16; i++) n[i] = Math.floor(Math.random() * 256); }
+    for (i = 0; i < 16; i++) s += a[n[i] % 36];
+    return s;
+  }
+  function adresse() {                                                  // l'adresse du relais, avec sa tête et le jeton de l'onglet
+    var t = null, j = '', q = [];
+    try { t = localStorage.getItem('berao-tete'); } catch (e) { t = null; }
+    try { j = sessionStorage.getItem('berao-moi') || ''; if (!/^[a-z0-9]{16}$/.test(j)) { j = jeton(); sessionStorage.setItem('berao-moi', j); } }
+    catch (e) { j = jetonPage || (jetonPage = jeton()); }
+    if (t !== null && /^\d{1,2}$/.test(t) && +t < TETES.length) q.push('tete=' + t);
+    q.push('tenue=' + tenueLocale());
+    if (j) q.push('moi=' + j);
+    return net.url + (q.length ? (net.url.indexOf('?') >= 0 ? '&' : '?') + q.join('&') : '');
+  }
   function ouvrir() {
     if (!net.url || net.ws || typeof WebSocket === 'undefined') return;
     var ws; net.etat = 'ouvre';
-    try { ws = new WebSocket(net.url); } catch (e) { perdre(); return; }
+    try { ws = new WebSocket(adresse()); } catch (e) { perdre(); return; }
     net.ws = ws;
     ws.onopen = function () { if (net.ws !== ws) return; net.etat = 'ouvert'; net.essais = 0; net.dernier = null; net.envoi = 0; net.battement = 25; };
     ws.onmessage = function (ev) { if (net.ws === ws) recevoir(ev.data); };
-    ws.onclose = ws.onerror = function () { if (net.ws !== ws) return; net.ws = null; perdre(); };
+    ws.onclose = ws.onerror = function (ev) {
+      if (net.ws !== ws) return;
+      if (ev && ev.code === 4002) { deconnecter(); return; }            // remplacé par une connexion plus récente du même onglet
+      net.ws = null; perdre();
+    };
   }
   function perdre() {                                                   // connexion perdue ou refusée : les fantômes s'effacent, on réessaiera
     purger(); net.id = null;
@@ -432,6 +508,9 @@ var FANTOMES = (function () {
     if (net.battement <= 0) { try { net.ws.send('ping'); } catch (err) {} net.battement = 25; }   // de loin en loin, pour que la connexion ne soit pas coupée en route
   }
   // Onglet caché : au bout de trente secondes on se déconnecte (les autres voient le fantôme partir) ; de retour, on se reconnecte.
+  if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('pagehide', function () {   // il quitte la page : on le dit au relais tout de suite
+    var ws = net.ws; if (ws) { try { ws.close(1000, 'parti'); } catch (e) {} }
+  });
   if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', function () {
     clearTimeout(net.veille);
     if (document.hidden) net.veille = setTimeout(function () { if (document.hidden && net.ws) { net.pause = true; try { net.ws.close(1000, 'onglet caché'); } catch (e) {} } }, R.veille * 1000);
@@ -589,7 +668,10 @@ var FANTOMES = (function () {
   })();
 
   var api = {
-    arrive: arrive, bouge: bouge, part: part, vider: vider, maj: maj, reglages: R, tetes: TETES, enPanne: function () { return panne; },
+    arrive: arrive, bouge: bouge, part: part, vider: vider, maj: maj, reglages: R, tetes: TETES, tenues: TENUES, habits: habits,
+    // sa tenue, telle que les autres la voient : celle que le relais a renvoyée, sinon celle gardée dans ce navigateur
+    maTenue: function () { return net.id ? net.tenue : tenueLocale(); },
+    enPanne: function () { return panne; },
     connecter: connecter, deconnecter: deconnecter,
     // le chat (pour chat.js) : envoyer un message, écouter ce qui arrive, masquer quelqu'un (ici seulement), modérer avec la clé
     chat: {
@@ -603,7 +685,7 @@ var FANTOMES = (function () {
       estMuet: function (id) { return !!muets[id]; },
       admin: ordonner
     },
-    reseau: function () { return { url: net.url, etat: net.etat, id: net.id, nom: net.nom, tete: net.tete, essais: net.essais, attente: net.attente, envoyes: net.envoyes, recus: net.recus, distants: distants() }; },
+    reseau: function () { return { url: net.url, etat: net.etat, id: net.id, nom: net.nom, tete: net.tete, tenue: net.tenue, essais: net.essais, attente: net.attente, envoyes: net.envoyes, recus: net.recus, distants: distants() }; },
     demo: function (n, graine) { return lancerDemo(n, graine); },
     enDemo: function () { return demo ? demo.gens.length : 0; },
     // pour les essais : chaque fantôme, là où le visiteur est (x, z) et là où son corps en est (px, pz)
@@ -611,7 +693,7 @@ var FANTOMES = (function () {
       var l = [], id, f, q;
       for (id in tous) {
         f = tous[id]; q = f.pnj ? f.pnj.position() : null;
-        l.push({ id: id, nom: f.nom || null, bulle: f.bulle ? { txt: f.bulle.txt, visible: !!(f.bulle.mesh && f.bulle.mesh.visible), y: f.bulle.mesh ? f.bulle.mesh.position.y : null } : null, etiquette: f.etiq ? { nom: f.etiq.nom, visible: f.etiq.m.visible, y: f.etiq.m.position.y, opacite: f.etiq.m.material.opacity } : null, tete: TETES[f.tete][0], x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
+        l.push({ id: id, nom: f.nom || null, bulle: f.bulle ? { txt: f.bulle.txt, visible: !!(f.bulle.mesh && f.bulle.mesh.visible), y: f.bulle.mesh ? f.bulle.mesh.position.y : null } : null, etiquette: f.etiq ? { nom: f.etiq.nom, visible: f.etiq.m.visible, y: f.etiq.m.position.y, opacite: f.etiq.m.material.opacity } : null, tete: TETES[f.tete][0], tenue: f.tenue, habits: f.pnj ? { tshirt: f.pnj.tenue.tshirt, pantalon: f.pnj.tenue.pantalon, casquette: f.pnj.tenue.casquette || null, capuche: f.pnj.options.capuche } : null, x: f.x, z: f.z, a: f.a, s: f.s, k: f.k, h: f.h, jet: f.jet ? (f.jet.ouvert() ? 'coule' : f.jet.repos() ? 'repos' : 'finit') : null, boit: !!(f.pnj && f.pnj.boit && f.pnj.boit()), corps: !!f.pnj, voile: f.voile, part: f.part, elu: f.elu,
                  px: q ? q[0] : null, pz: q ? q[1] : null, pose: f.pnj ? f.pnj.options.pose : null, marche: f.pnj ? f.pnj.enMarche() : false });
       }
       return l;

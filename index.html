@@ -405,9 +405,9 @@ body {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="pnj.js?v=200ff4b7"></script>
+<script src="pnj.js?v=c023ec28"></script>
 <script src="pipi.js?v=e6d0b8b6"></script>
-<script src="modeles.js?v=f30e200d"></script>
+<script src="modeles.js?v=75c2a6ec"></script>
 <script src="signal.js?v=40755415"></script>
 <script>
 (function () {
@@ -1124,7 +1124,7 @@ body {
   // Tables en bois miel aux angles arrondis, chacune avec son léger travers du croquis
   var TABLES = [[[377, 468], [379, 563], 62], [[486, 462], [484, 563], 50],
                 [[368, 707], [372, 803], 58], [[488, 672], [484, 760], 60]];
-  var lampSpots = [], LAMPS = [];                                 // LAMPS : [objet répété, positions] des trois pièces des suspensions
+  var lampSpots = [], LAMPS = [], LAMPES = [];                    // LAMPS : [objet répété, positions] des trois pièces des suspensions faites à la main ; LAMPES : les modèles
   TABLES.forEach(function (t, i) {
     var a = P(t[0][0], t[0][1]), b = P(t[1][0], t[1][1]);
     var w = t[2] * K / 2, dx = b[0] - a[0], dz = b[1] - a[1], l = Math.sqrt(dx * dx + dz * dz);
@@ -1181,8 +1181,20 @@ body {
       slab([a[0] + o[0], a[1] + o[1]], [b[0] + o[0], b[1] + o[1]], 0.09, 0.44, 0.62, M.burgundy);   // dossier : collé au mur, il n'arrête que le jet
     }
   });
-  // Suspensions en laiton à étages, qui diffusent une lumière jaune
+  // Suspensions en laiton à étages, qui diffusent une lumière jaune : le modèle de l'atelier « Modèle 3D style PS1 ». Le bas du
+  // corps pend à 1,33 m du sol, comme les anciennes ; son câble est étiré jusqu'au plafond. Chacune tournée un peu autrement.
   (function () {
+    var base = 1.33, H = 0.314, CABLE = 0.6;
+    if (!window.MODELES || window.MODELES.noms().indexOf('suspension') < 0) return;
+    lampSpots.forEach(function (s, i) {
+      var g = window.MODELES.creer(THREE, 'suspension', { pret: function (r) {
+        var c = window.MODELES.trouver(r, 'cable'); if (c) c.scale.y = (ROOM_H - base - H) / CABLE;
+      } });
+      g.position.set(s[0], base + H, s[1]); g.rotation.y = 0.5 + i * 0.9;
+      scene.add(g); LAMPES.push(g);
+    });
+  })();
+  if (!LAMPES.length) (function () {                               // secours : les suspensions faites à la main
     var base = 1.33, top = 0.265, cord = ROOM_H - base - top;
     var brass = merged([[boxG(0.012, cord, 0.012), 0, top + cord / 2, 0],
       [cylG(0.075, 0.04, 0.05, 8), 0, 0.24, 0],
@@ -1953,7 +1965,7 @@ body {
     var k;
     for (k in TENUE) if (!(k in o)) o[k] = TENUE[k];                 // la tenue commune, sauf les calques qu'il apporte lui-même
     o.taille = o.taille || PNJ_TAILLE; o.vie = !CALM;                // solides : le jet de pipi s'écrase sur eux
-    o.mains = { ecart: 0.95 * PNJ_LARGE };                           // les mains suivent l'élargissement du corps
+    o.mains = { ecart: (o.mainsEcart || 0.95) * PNJ_LARGE }; delete o.mainsEcart;   // les mains suivent l'élargissement du corps (plus près pour un hoodie)
     if (o.sansMains) o.main = o.paume = null;                        // pas de mains du module : la page pose les siennes (les amoureux)
     o.pret = function (n) { n.corps.scale.x = PNJ_LARGE; };
     return window.PNJ.creer(o);
@@ -2018,7 +2030,7 @@ body {
   }
   function pnjVise() {
     var mieux = null, note = 0;
-    [barman, assis].forEach(function (n) {
+    [barman].forEach(function (n) {                               // le Danois, à côté de la télécommande : on ne lui parle plus
       if (!n || n.parle() || n.sert()) return;                   // occupé : il finit sa phrase, ou son service
       var q = n.position(), dx = q[0] - pos.x, dz = q[1] - pos.z, d = Math.sqrt(dx * dx + dz * dz);
       if (d > n.options.portee || d < 0.01 || (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) / d < 0.5) return;
@@ -3139,6 +3151,7 @@ body {
   // Trois suspensions pendent entre la chaise et le mur de la télé : on les escamote le temps de regarder
   function suspensions(on, lesquelles) {                         // sans précision : les trois qui gênent la télé
     var d = new THREE.Object3D();
+    LAMPES.forEach(function (g, i) { if ((lesquelles || [0, 2, 3]).indexOf(i) >= 0) g.visible = on; });
     LAMPS.forEach(function (L) {
       if (!L[0]) return;
       (lesquelles || [0, 2, 3]).forEach(function (i) {
@@ -3521,6 +3534,7 @@ body {
   }
   function partirAuxArchives() {
     noterRetour();
+    if (window.FANTOMES && window.FANTOMES.deconnecter) window.FANTOMES.deconnecter();   // aux archives, il n'est plus dans le bar : son fantôme s'en va
     if (ARCH.absente) { location.reload(); return; }            // pas de page d'archives : on se retrouve devant la porte, refermée
     setTimeout(archivesIci, 2500);
     window.location.href = ARCH_PAGE;
@@ -4527,8 +4541,8 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
 })();
 </script>
 <script src="trace.js?v=38524a08"></script>   <!-- le journal de visite : voir trace.js -->
-<script src="fantomes.js?v=60ea5c77"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
+<script src="fantomes.js?v=a98eb284"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 <script src="chat.js?v=fe2de6c4"></script>   <!-- le chat, en bas à droite : voir chat.js -->
-<script src="miroir.js?v=45298bfc"></script>   <!-- on se voit dans le miroir des toilettes : voir miroir.js -->
+<script src="miroir.js?v=5f705d40"></script>   <!-- on se voit dans le miroir des toilettes : voir miroir.js -->
 </body>
 </html>
