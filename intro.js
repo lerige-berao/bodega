@@ -69,7 +69,7 @@
     '#bi{position:fixed;inset:0;z-index:2147483000;overflow:hidden;background:' + FOND + ';isolation:isolate;' +
       'touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}' +
     '#bi *{box-sizing:border-box}' +
-    '#bi .scene{position:absolute;inset:0}' +
+    '#bi .scene{position:absolute;inset:0;visibility:hidden}#bi.vu .scene{visibility:visible}' +
     '#bi .noir{position:absolute;inset:0;background:' + NOIR + ';opacity:0;pointer-events:none}' +
     '#bi .attente{position:absolute;left:0;right:0;top:50%;margin:-0.6em 0 0;text-align:center;color:#a89c84;opacity:0;transition:opacity .4s;' +
       'font:12px ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;pointer-events:none}' +
@@ -116,13 +116,13 @@
   racine.id = 'bi';
   racine.innerHTML =
     '<div class="scene"><div class="pc">' +
-      '<img class="tag" alt="BERAO" src="' + base + 'tag.webp">' +
+      '<img class="tag" alt="BERAO" fetchpriority="high" src="' + base + 'tag.webp">' +
       '<div class="selection" aria-hidden="true">' +
         '<i style="left:-.5px;top:-.5px"></i><i style="left:50%;top:-.5px"></i><i style="left:100%;top:-.5px"></i>' +
         '<i style="left:-.5px;top:50%"></i><i style="left:100%;top:50%"></i>' +
         '<i style="left:-.5px;top:100%"></i><i style="left:50%;top:100%"></i><i style="left:100%;top:100%"></i>' +
       '</div>' +
-      '<img class="bande" alt="" src="' + base + 'bande.webp">' +
+      '<img class="bande" alt="" fetchpriority="high" src="' + base + 'bande.webp">' +
       '<div class="term" aria-label="Enter your pseudo, then press Enter">' +
         '<div class="barre" aria-hidden="true">' +
           '<div class="onglet"><span class="ico">&gt;_</span><span class="titre">BERAO</span><span class="fx"></span></div>' +
@@ -143,6 +143,28 @@
       ecran = racine.querySelector('.ecran'), form = racine.querySelector('form'), champ = racine.querySelector('.champ'),
       lu = racine.querySelector('.lu');
   if (PC) form.parentNode.removeChild(form);
+
+  /* ---------- Tout apparaît en même temps ---------- */
+  // La scène reste cachée tant que le tag et la bande ne sont pas décodés : pas de terminal seul sur fond blanc,
+  // ni d'image qui arrive après. Au plus 8 s (une image qui ne vient pas ne bloque pas l'entrée). Avant, on ne tape rien.
+  var vu = false;
+  function montrer() {
+    if (vu) return;
+    vu = true; clearTimeout(lent); clearTimeout(auPlus);
+    if (attente.textContent === 'Loading…') {               // « Loading… » s'efface d'un coup, en même temps que tout apparaît
+      attente.style.transition = 'none'; attente.style.opacity = '0'; void attente.offsetWidth; attente.style.transition = '';
+    }
+    racine.classList.add('vu');
+  }
+  var lent = setTimeout(function () { if (!vu) { attente.textContent = 'Loading…'; attente.style.opacity = '1'; } }, 700);
+  var auPlus = setTimeout(montrer, 8000);
+  function prete(im) {
+    var charge = (im.complete && im.naturalWidth) ? Promise.resolve() : new Promise(function (r) {
+      im.addEventListener('load', r); im.addEventListener('error', r);
+    });
+    return charge.then(function () { return im.decode && im.naturalWidth ? im.decode().catch(function () {}) : null; });
+  }
+  Promise.all([prete(tag), prete(bande)]).then(montrer, montrer);
 
   /* ---------- Le reste de la page attend dehors ---------- */
   // Tant qu'on est dehors, le bodega ne reçoit aucune touche (ce script est chargé avant lui : il écoute le premier),
@@ -208,7 +230,7 @@
 
   // Ordinateur : on lit les touches directement (elles n'atteignent jamais le bodega).
   function clavier(e) {
-    if (parti) { e.preventDefault(); return; }
+    if (parti || !vu) { e.preventDefault(); return; }
     var k = e.key;
     if (k === 'Enter' || e.code === 'NumpadEnter') { e.preventDefault(); if (!e.repeat) valide(); return; }
     if (k === 'Backspace') { e.preventDefault(); var a = Array.from(saisie); a.pop(); saisie = a.join(''); tape.textContent = saisie; allume(); return; }
@@ -217,7 +239,7 @@
     if (k && Array.from(k).length === 1) { e.preventDefault(); ajoute(k); }
   }
   function coller(e) {
-    if (!dehors || parti || !PC) return;
+    if (!dehors || parti || !PC || !vu) return;
     var t = (e.clipboardData || window.clipboardData);
     t = t && t.getData('text');
     if (t) { e.preventDefault(); ajoute(String(t).split(/\r?\n/)[0]); }
@@ -235,7 +257,7 @@
     form.addEventListener('submit', function (e) { e.preventDefault(); valide(); });
     racine.addEventListener('click', function () {
       if (vientDeTirer) { vientDeTirer = false; return; }
-      if (!parti) { placerChamp(); champ.focus({ preventScroll: true }); }
+      if (!parti && vu) { placerChamp(); champ.focus({ preventScroll: true }); }
     });
   }
   dessiner();
