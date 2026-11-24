@@ -40,30 +40,38 @@ var FANTOMES = (function () {
     ['tete4', 0.5, 0.03, 1.1],      // cheveux bouclés, yeux fermés
     ['tete5', 0.40, 0, 1.05],       // casquette, dents en vrac
     ['tete6', 0.38, 0.22, 1.25],    // cheveux ondulés
-    ['tete7', 0.48, 0, 1.2],        // crâne à cornes
+    ['tete42', 0.5, 0, 1.1],        // tête carrée, yeux en triangle   (à la place de tete7, le démon : c'est l'amoureux du banc)
     ['tete8', 0.47, 0, 1.05],       // singe
     ['tete9', 0.48, 0.33, 1.35],    // longs cheveux, yeux plissés
     ['tete10', 0.43, 0, 1.05],      // joufflu qui tire la langue
     ['tete11', 0.47, 0, 1.1],       // grand front, oreilles pointues
     ['tete12', 0.45, 0, 1.05],      // bosselé au monocle
     ['tete13', 0.43, 0, 1.1],       // gobelin
-    ['tete14', 0.5, 0, 1.15],       // voile, bandeau de perles, oreilles pointues
+    ['tete31', 0.41, 0, 1.2],       // chapeau de champignon, long nez   (à la place de tete14)
     ['tete15', 0.5, 0.15, 1.3],     // cheveux en bataille, au feutre
-    ['tete16', 0.5, 0.05, 1.25],    // profil à grandes dents
+    ['tete32', 0.43, 0.05, 1.1],    // fauve au stylo, mèche en spirale   (à la place de tete16)
     ['tete17', 0.5, 0, 1.15],       // félin au crayon
     ['tete18', 0.5, 0, 1.1],        // crâne sur papier rose
     ['tete19', 0.5, 0, 1.1],        // gros yeux et cornes
     ['tete20', 0.5, 0.2, 1.25],     // diable aux yeux en croix, langue pendante
     ['tete21', 0.5, 0.03, 1.15],    // capuche, visage noir
     ['tete22', 0.58, 0, 0.85],      // cheveux en nuage, lunettes
-    ['tete23', 0.5, 0.05, 1],       // aquarelle bleue, oreilles tombantes
+    ['tete33', 0.5, 0, 1.05],       // couronne de boucles   (à la place de tete23)
     ['tete24', 0.45, 0.03, 1.2],    // rictus, longs cheveux, oreille pointue
     ['tete25', 0.5, 0, 1.1],        // bouclé, de trois quarts
     ['tete26', 0.5, 0, 1.2],        // coiffe en toile d'araignée
     ['tete27', 0.52, 0, 1.15],      // souris hilare
     ['tete28', 0.5, 0, 1.1],        // masque au stylo bleu
     ['tete29', 0.55, 0, 1.1],       // écailles au stylo violet
-    ['tete30', 0.5, 0, 1.15]        // tigre qui rugit
+    ['tete30', 0.5, 0, 1.15],       // tigre qui rugit
+    ['tete34', 0.5, 0, 1.1],        // souris aux grandes oreilles
+    ['tete35', 0.43, 0, 1.05],      // gros yeux, bouche béante
+    ['tete36', 0.56, 0, 1.2],       // profil sous une frange, oreille pointue
+    ['tete37', 0.5, 0, 1.15],       // boule à étoile et grandes dents
+    ['tete38', 0.5, 0, 1.15],       // gobelin à crête
+    ['tete39', 0.47, 0, 1.35],      // diable hachuré
+    ['tete40', 0.38, 0.1, 1.2],     // grosse chevelure, grosses lèvres
+    ['tete41', 0.5, 0, 0.62]        // tête plate à crocs
   ];
   // Les tenues : un haut, un bas, une coiffe (ou rien), tirés au hasard à la première visite. [face, dos, capuche, mains]
   // capuche : la part haute de l'image qui monte derrière la tête ; mains : où elles flottent (1 = comme avec un t-shirt).
@@ -83,7 +91,7 @@ var FANTOMES = (function () {
     coiffes: [null, ['pnj-casquette-trucker', 'pnj-casquette-trucker-dos', { largeur: 0.8, hauteur: 0.5, front: 0.34 }]],   // sa boîte sur la tête : au-dessus des yeux
     chance: { short: 0.4, coiffe: 0.3 },
     // les têtes qui peuvent porter une casquette (pas de cornes, de capuche, de voile, de casquette déjà dessinée...)
-    casquables: ['tete3', 'tete4', 'tete6', 'tete8', 'tete9', 'tete10', 'tete11', 'tete12', 'tete13', 'tete18', 'tete24', 'tete25', 'tete28']
+    casquables: ['tete3', 'tete4', 'tete6', 'tete8', 'tete9', 'tete10', 'tete11', 'tete12', 'tete13', 'tete18', 'tete24', 'tete25', 'tete28', 'tete42']
   };
   function lireTenue(v) {                                               // "h.b.c" ramené aux listes, ou null
     var m = typeof v === 'string' && /^(\d{1,2})\.(\d{1,2})\.(\d{1,2})$/.exec(v);

@@ -896,6 +896,7 @@ body {
   }
   // Listes d'objets répétés, remplies au fil de la construction puis dessinées d'un coup à la fin.
   var hooks = [], bottles = [], beers = [], minis = [], glasses = [], packs = [], trucks = [], fairy = [];
+  var biereCouple = null;                                        // la bière de la table des amoureux : un objet à part (la fille la boit)
   var BOTTLE_COLORS = [0x2f6b3a, 0x7a4a1c, 0xcfd6d0, 0x23201c, 0xb8862c, 0x2f6b3a, 0x7a4a1c];
   function v2(p) { return new THREE.Vector2(p[0], p[1]); }
   function lathe(pts, seg) { return new THREE.LatheGeometry(pts.map(v2), seg || 6); }
@@ -1141,7 +1142,8 @@ body {
     // Sur la table : cendrier noir, puis bière et petites bouteilles emballées, ou gobelet à dés
     mesh(cylG(0.06, 0.05, 0.03, 8), M.black, cx + 0.05, 0.765, cz - 0.12);
     if (i === 0 || i === 3) {
-      beers.push({ x: cx - 0.06, y: 0.75, z: cz + 0.12, ry: rnd() * 6 });
+      var bi = { x: cx - 0.06, y: 0.75, z: cz + 0.12, ry: rnd() * 6 };
+      if (i === 0) biereCouple = bi; else beers.push(bi);         // la table du banc des amoureux : voir COUPLE.boit
       minis.push({ x: cx + 0.06, y: 0.75, z: cz + 0.2, ry: rnd() * 6 }, { x: cx - 0.1, y: 0.75, z: cz + 0.26, ry: rnd() * 6 },
                  { x: cx + 0.02, y: 0.75, z: cz + 0.02, ry: rnd() * 6 });
       mesh(boxG(0.035, 0.025, 0.03), M.cream, cx + 0.1, 0.762, cz + 0.3, 0.7);
@@ -1662,6 +1664,13 @@ body {
   var MINI = [[0, 0], [0.016, 0], [0.016, 0.02], [0.016, 0.05], [0.016, 0.065], [0.008, 0.08], [0.008, 0.095], [0, 0.095]];
   inst(lathe(BOTTLE), M.bottle, bottles);
   inst(lathe(BEER), M.beer, beers);
+  if (biereCouple) {                                             // la même bouteille, seule : tenue par son cul, elle peut basculer
+    biereCouple.mesh = new THREE.Mesh(lathe(BEER), M.beer.clone());
+    biereCouple.mesh.rotation.order = 'YXZ';
+    biereCouple.mesh.position.set(biereCouple.x, biereCouple.y, biereCouple.z); biereCouple.mesh.rotation.y = biereCouple.ry;
+    biereCouple.haut = 0.225;                                    // du cul au goulot
+    scene.add(biereCouple.mesh);
+  }
   inst(lathe(MINI), M.mini, minis);
   inst(cylG(0.03, 0.022, 0.09, 6), M.glass, glasses);
   inst(boxG(0.085, 0.022, 0.055), M.plain, packs);
@@ -1989,6 +1998,7 @@ body {
     // et se tourne vers le joueur sans jamais passer à travers son dossier. La chaise a déjà sa collision.
     ASSIS_FACE = assisAngle = CHAIRS[2][2] + Math.PI;
     assis = creerPnj({ pos: P(CHAIRS[2][0], CHAIRS[2][1]), pose: 'assis', siege: 0.47, face: ASSIS_FACE, taille: PNJ_ASSIS, rayon: 0.18,
+                       tete: 'tete43.png', teteDos: 'tete43-dos.png', cou: 0.53, enfonce: 0, grosseur: 0.95,   // cheveux en trois pointes, oreilles décollées
                        voix: { hauteur: 92, ivresse: 0.95 } });
   }
   // Le client assis est un carton à deux faces planté sur sa chaise. De face, il tourne son recto vers le joueur ; quand le joueur
@@ -2049,10 +2059,26 @@ body {
   var COUPLE = { a: null, b: null, mains: [], t: 0,
     x: P(315, 0)[0] + 0.116, z: (P(0, 468)[1] + P(0, 563)[1]) / 2,   // le milieu du banc, un peu en avant du dossier
     cap: 0.2,                                    // le couple est tourné d'autant vers l'allée (radians) ; 0 = dos bien à plat contre le mur
-    temps: [2.4, 0.55, 4.6, 0.7],                // secondes : ouverts, ils se rapprochent, ils s'embrassent, ils se rouvrent
+    temps: [20, 0.55, 3.4, 0.7],                 // secondes : ouverts, ils se rapprochent, ils s'embrassent, ils se rouvrent (un baiser toutes les 25 s environ)
     ecart: [0.38, 0.07],                         // distance entre les deux cartons, ouverts puis collés (mètres)
     tourne: [0.95, 0.05],                        // de combien chacun se tourne vers la salle, ouvert puis collé (radians ; π/2 = de face)
-    recul: 0.04                                  // collés, ils se calent d'autant dans le dossier, pour moins déborder sur la table
+    recul: 0.04,                                 // collés, ils se calent d'autant dans le dossier, pour moins déborder sur la table
+    // La gorgée : tant qu'ils sont ouverts, la fille boit parfois la bière posée devant elle. Sa main libre sort, prend la bouteille,
+    // la porte à sa bouche, la bascule, puis la repose à sa place sur la table.
+    boit: { chance: 0.5,                         // part des cycles où elle boit (un cycle = d'un baiser au suivant)
+            duree: [0.7, 0.9, 1.5, 0.8, 0.6],    // secondes : la main vient, la bouteille monte, elle boit, la bouteille redescend, la main repart
+            calme: [4, 2],                       // pas de gorgée dans les 4 s qui suivent un baiser, ni dans les 2 s qui précèdent le suivant
+            bascule: 1.95,                       // la bouteille au goulot : 0 = debout, π/2 = couchée, au-delà = le cul en l'air
+            bouche: 0.14 },                      // la bouche, sous le milieu de l'image de la tête (part de sa hauteur)
+    biere: biereCouple, gorgeeEn: null           // la bouteille ; pendant une gorgée : { main, leve, bascule }
+  };
+  // Le début de la gorgée du cycle n (secondes depuis le début du cycle), ou -1 s'il n'y en a pas. Le tirage ne dépend que de n :
+  // le même cycle donne toujours la même chose (les essais fixent le temps à la main).
+  COUPLE.gorgee = function (n) {
+    var C = COUPLE, G = C.boit, D = G.duree[0] + G.duree[1] + G.duree[2] + G.duree[3] + G.duree[4], libre = C.temps[0] - D - G.calme[0] - G.calme[1];
+    function alea(k) { var x = Math.sin(n * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); }
+    if (!C.biere || !C.biere.mesh || libre < 0 || alea(1) >= G.chance) return -1;
+    return G.calme[0] + alea(2) * libre;
   };
   if (window.PNJ) (function () {
     var C = COUPLE;
@@ -2061,9 +2087,9 @@ body {
       o.sansMains = true; o.assis = { avance: 0 };                   // un carton qui tourne sur place, sans s'avancer vers le joueur
       return creerPnj(o);
     }
-    // celui de gauche, côté fenêtres : la fille aux cheveux longs ; celui de droite : le mec à la casquette, un peu plus petit et plus roux
+    // celui de gauche, côté fenêtres : la fille aux cheveux longs ; celui de droite : le démon (crâne à cornes), un peu plus petit et plus roux
     C.a = amoureux({ taille: PNJ_ASSIS, tete: 'tete6.png', teteDos: 'tete6-dos.png', cou: 0.38, enfonce: 0.22, grosseur: 1.25 });
-    C.b = amoureux({ taille: PNJ_ASSIS * 0.95, teinte: 0xe0aa8c, tete: 'tete5.png', teteDos: 'tete5-dos.png', cou: 0.40, enfonce: 0, grosseur: 1.05 });
+    C.b = amoureux({ taille: PNJ_ASSIS * 0.95, teinte: 0xe0aa8c, tete: 'tete7.png', teteDos: 'tete7-dos.png', cou: 0.48, enfonce: 0, grosseur: 1.2 });
     // Quatre mains à deux faces (le dos côté salle, la paume derrière), faites avec les mêmes images et la même finition que celles des PNJ
     window.PNJ.charger('main.png', function (dos) {
       window.PNJ.charger('paume.png', function (paume) {
@@ -2092,7 +2118,7 @@ body {
   })();
   function mesuresPnj(n) {                                           // où sont sa tête, ses épaules et son buste : lus sur ses morceaux
     var mo = n.morceaux, pied = n.corps.position.y, k = n.corps.scale.x;
-    return { tete: pied + mo.tete.position.y + mo.tete.scale.y * 0.5, lTete: mo.tete.scale.x * k * 0.42,
+    return { tete: pied + mo.tete.position.y + mo.tete.scale.y * 0.5, lTete: mo.tete.scale.x * k * 0.42, hTete: mo.tete.scale.y,
       epaule: pied + mo.torse.position.y + mo.torse.scale.y * 0.86, buste: pied + mo.torse.position.y + mo.torse.scale.y * 0.5, lBuste: mo.torse.scale.x * k * 0.42 };
   }
   function animerCouple(dt) {
@@ -2132,6 +2158,37 @@ body {
       m.rotation.y = Math.PI / 2 - C.cap; m.rotation.z = rz;         // à plat, face à celui qui regarde
       m.position.set(q[0], a[1] + (b[1] - a[1]) * p + Math.cos(rz) * d, q[1]);
     }
+    // La gorgée de la fille, pendant qu'ils sont ouverts. Sa main libre est la troisième (sa gauche), cachée tant qu'ils ne sont pas collés.
+    var Bi = C.biere, G = C.boit, Dg = G.duree, bo = Bi && Bi.mesh;
+    if (!bo) return;
+    var g0 = CALM ? -1 : C.gorgee(Math.floor(C.t / (T[0] + T[1] + T[2] + T[3]))), tg = u - g0, fin = Dg[0] + Dg[1] + Dg[2] + Dg[3] + Dg[4];
+    var a0 = C.tourne[0], nu = Math.cos(a0), nw = Math.sin(a0);     // la normale du carton de la fille, ouverte : vers où regarde son visage
+    var cap0 = Math.atan2(-nu * sn - nw * cs, nu * cs - nw * sn);     // le cap du goulot quand il vient vers sa bouche (repère de la salle)
+    if (g0 < 0 || tg <= 0 || tg >= fin) {                            // pas de gorgée : la bouteille est à sa place sur la table
+      bo.position.set(Bi.x, Bi.y, Bi.z); bo.rotation.set(0, cap0, 0); C.gorgeeEn = null;
+      return;
+    }
+    function lisse(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+    var e = lisse(tg / Dg[0]) * (1 - lisse((tg - fin + Dg[4]) / Dg[4]));                                  // la main : 0 rentrée, 1 sur la bouteille
+    var k = lisse((tg - Dg[0]) / Dg[1]) * (1 - lisse((tg - Dg[0] - Dg[1] - Dg[2]) / Dg[3]));             // la bouteille : 0 sur la table, 1 à la bouche
+    var bas = G.bascule * lisse((k - 0.3) / 0.7) + (k >= 0.999 ? 0.09 * Math.sin(C.t * 4.1) : 0);         // elle bascule surtout en arrivant aux lèvres
+    // dans le repère du couple (u à droite, v en haut, w vers la salle) : la bouteille au repos, la bouche, l'axe du cul vers le goulot
+    var ru = (Bi.x - C.x) * sn - (Bi.z - C.z) * cs, rw = (Bi.x - C.x) * cs + (Bi.z - C.z) * sn;
+    var mu = -s / 2 + nu * 0.03, mv = A.tete - G.bouche * A.hTete, mw = nw * 0.03;
+    var axu = -nu * Math.sin(bas), axv = Math.cos(bas), axw = -nw * Math.sin(bas);
+    var bu = ru + (mu - Bi.haut * axu - ru) * k, bv = Bi.y + (mv - Bi.haut * axv - Bi.y) * k, bw = rw + (mw - Bi.haut * axw - rw) * k;
+    var qbo = lieu(bu, bw);
+    bo.position.set(qbo[0], bv, qbo[1]); bo.rotation.set(bas, cap0, 0);
+    // sa main : elle sort de ses genoux, se pose sur le corps de la bouteille (côté salle), la suit, puis rentre
+    var m2 = C.mains[2], pu = bu + axu * 0.09, pv = bv + axv * 0.09, pw = bw + axw * 0.09 + 0.045;
+    var lu = -s / 2 + 0.06, lv = A.buste - 0.12, lw = 0.1;
+    var hu = lu + (pu - lu) * e, hv = lv + (pv - lv) * e, hw = lw + (pw - lw) * e;
+    var rz2 = 0.3 + (Math.PI / 2 - 0.15) * e + 0.7 * k, d2 = 0.55 * C.h * e, qh = lieu(hu - Math.sin(rz2) * d2, hw);
+    m2.visible = e > 0.02;
+    m2.scale.set(C.l * e, C.h * e, 1);
+    m2.rotation.y = Math.PI / 2 - C.cap; m2.rotation.z = rz2;
+    m2.position.set(qh[0], hv + Math.cos(rz2) * d2, qh[1]);
+    C.gorgeeEn = { main: e, leve: k, bascule: bas };
   }
 
   // Un PNJ sur qui on fait pipi parle sans s'arrêter : dès qu'une phrase finit, il en commence une autre, tant que le jet le touche
@@ -4541,7 +4598,7 @@ window.Jukebox = { open: approach, ready, close: leave, gone, face: paintFace, c
 })();
 </script>
 <script src="trace.js?v=38524a08"></script>   <!-- le journal de visite : voir trace.js -->
-<script src="fantomes.js?v=a98eb284"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
+<script src="fantomes.js?v=9254c0a6"></script>   <!-- les autres visiteurs, en fantômes : voir fantomes.js -->
 <script src="chat.js?v=fe2de6c4"></script>   <!-- le chat, en bas à droite : voir chat.js -->
 <script src="miroir.js?v=5f705d40"></script>   <!-- on se voit dans le miroir des toilettes : voir miroir.js -->
 </body>
